@@ -1,0 +1,17 @@
+# 构建产物
+dist/
+.build/
+
+# 临时文件
+.tmp/
+
+# 引擎内部
+.project/
+.emmylua/
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 日志
+logs/
