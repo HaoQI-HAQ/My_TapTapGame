@@ -1,17 +1,51 @@
-# 构建产物
-dist/
+# Build artifacts & runtime state
 .build/
-
-# 临时文件
-.tmp/
-
-# 引擎内部
-.project/
-.emmylua/
-
-# 系统文件
-.DS_Store
-Thumbs.db
-
-# 日志
+dist/
+.cli/
 logs/
+*.log
+logs/.nfs*
+.sce/logs/
+.sce/build/build_steps/__pycache__/
+
+# Temp & swap files
+.tmp/
+*.crswap
+.DS_Store
+
+# OSS util
+.ossutil_checkpoint/
+ossutil_output/
+
+# Editor / IDE / agent configs
+.vscode/
+.cursor/
+.codex/
+.gemini/
+.claude/
+.emmylua/
+.installer/
+.maker/
+
+# Maker engine assets & agent files (provided by ai-dev-kit, not user source)
+engine-docs/
+examples/
+lua-tools/
+schemas/
+skills/
+templates/
+tools/
+urhox-libs/
+AGENTS.md
+CLAUDE.md
+
+# Engine-generated project config (contains project_id / developer_id)
+.project/
+
+# Agent skill discovery dirs
+.agents/
+.opencode/
+
+# Large media & captures (regenerable from art spec)
+assets/
+screenshots/
