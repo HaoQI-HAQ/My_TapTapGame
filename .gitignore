@@ -46,6 +46,8 @@ CLAUDE.md
 .agents/
 .opencode/
 
-# Large media & captures (regenerable from art spec)
-assets/
+# Temp upload staging (chat attachments)
+_uploads/
+
+# Captures (regenerable from art spec)
 screenshots/

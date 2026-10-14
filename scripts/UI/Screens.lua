@@ -6,6 +6,7 @@
 local UI = require("urhox-libs/UI")
 local GameLogic = require("Game.GameLogic")
 local GameData = require("Data.GameData")
+local Dice3D = require("UI.Dice3D")
 
 local Screens = {}
 
@@ -498,13 +499,34 @@ function Screens.CreateDrinkBrandSelect()
 end
 
 -- ============================================================================
+-- 骰子音效（模块级单例，避免每回合重建场景）
+-- ============================================================================
+local diceAudio_ = { scene = nil, roll = nil, land = nil }
+
+local function PlayDiceSound(landing)
+    if not diceAudio_.scene then
+        diceAudio_.scene = Scene()
+        local node = diceAudio_.scene:CreateChild("DiceAudio")
+        diceAudio_.roll = node:CreateComponent("SoundSource")
+        diceAudio_.land = node:CreateComponent("SoundSource")
+    end
+    local source = landing and diceAudio_.land or diceAudio_.roll
+    local path = landing and "audio/sfx/dice_land.mp3" or "audio/sfx/dice_roll.mp3"
+    local sound = cache:GetResource("Sound", path)
+    if source and sound then
+        source:Play(sound, sound:GetFrequency(), landing and 0.75 or 0.6)
+    end
+end
+
+-- ============================================================================
 -- 游戏进行界面 (playing)
+-- 流程：点击摇骰 → 双方骰子同时翻滚 → 落定揭晓 → 出现对话选项
 -- ============================================================================
 function Screens.CreateGameScreen()
     local s = GameLogic.State
 
-    -- 摇骰子
-    local p, o = GameLogic.RollDice()
+    -- 先由数据层决定本回合结果与事件，动画只负责"演"出来
+    local playerRoll, opponentRoll = GameLogic.RollDice()
     local event = GameLogic.GetNextEvent()
 
     if not event then
@@ -514,7 +536,9 @@ function Screens.CreateGameScreen()
         return UI.Panel { width = "100%", height = "100%" }
     end
 
-    -- 选项按钮
+    -- ------------------------------------------------------------------
+    -- 选项按钮（初始隐藏，摇骰结束后才出现）
+    -- ------------------------------------------------------------------
     local choiceButtons = {}
     for i, choice in ipairs(event.choices) do
         table.insert(choiceButtons, UI.Panel {
@@ -541,61 +565,37 @@ function Screens.CreateGameScreen()
         })
     end
 
-    -- 骰子描述
-    local diceResult = GameLogic.GetDiceResult()
-    local diceDesc = diceResult == "tie" and "🍻 平局干杯！"
-        or diceResult == "advantage" and "💪 你占优势！"
-        or "😅 对方优势..."
+    -- ------------------------------------------------------------------
+    -- 双方立体骰子
+    -- ------------------------------------------------------------------
+    local playerDice = Dice3D.View { styleKey = "classic", width = 130, height = 145 }
+    local opponentDice = Dice3D.View { styleKey = "classic", width = 130, height = 145 }
 
-    return UI.Panel {
-        width = "100%", height = "100%",
-        backgroundColor = C.bgDark,
+    -- ------------------------------------------------------------------
+    -- 摇骰按钮 与 结果提示
+    -- ------------------------------------------------------------------
+    local rollButton = UI.Button {
+        text = "🎲  摇骰子",
+        width = 190, height = 46,
+        variant = "primary",
+        fontSize = 16,
+    }
+
+    local resultLabel = UI.Label {
+        text = "点击摇骰子，看看谁掌握话语权",
+        fontSize = 12,
+        fontColor = C.textGray,
+        textAlign = "center",
+    }
+
+    -- ------------------------------------------------------------------
+    -- 对话区（事件文本 + 选项，初始隐藏）
+    -- ------------------------------------------------------------------
+    local dialogArea = UI.Panel {
+        width = "100%",
+        flex = 1, flexBasis = 0,
         flexDirection = "column",
         children = {
-            -- HUD
-            CreateHUD(),
-            -- 属性条
-            UI.Panel {
-                width = "100%", paddingLeft = 14, paddingRight = 14, paddingTop = 6, paddingBottom = 6,
-                flexDirection = "row", gap = 8,
-                children = {
-                    UI.Panel { flex = 1, children = { AttrBar("好感", s.favor, C.green) } },
-                    UI.Panel { flex = 1, children = { AttrBar("清醒", s.sober, C.blue) } },
-                    UI.Panel { flex = 1, children = { AttrBar("氛围", s.vibe, C.purple) } },
-                },
-            },
-            -- 骰子区
-            UI.Panel {
-                width = "100%", padding = 10,
-                alignItems = "center", gap = 4,
-                children = {
-                    UI.Panel {
-                        flexDirection = "row", gap = 20, alignItems = "center",
-                        children = {
-                            UI.Panel {
-                                width = 44, height = 44,
-                                backgroundColor = { 255, 255, 255, 255 },
-                                borderRadius = 8,
-                                justifyContent = "center", alignItems = "center",
-                                children = {
-                                    UI.Label { text = tostring(p), fontSize = 22, fontWeight = "bold", fontColor = { 30, 30, 30, 255 } },
-                                },
-                            },
-                            UI.Label { text = "VS", fontSize = 13, fontColor = C.textGray },
-                            UI.Panel {
-                                width = 44, height = 44,
-                                backgroundColor = { 70, 70, 70, 255 },
-                                borderRadius = 8,
-                                justifyContent = "center", alignItems = "center",
-                                children = {
-                                    UI.Label { text = tostring(o), fontSize = 22, fontWeight = "bold", fontColor = C.textWhite },
-                                },
-                            },
-                        },
-                    },
-                    UI.Label { text = diceDesc .. " (回合 " .. s.round .. "/" .. s.maxRounds .. ")", fontSize = 11, fontColor = C.textGray },
-                },
-            },
             -- 事件文本
             UI.Panel {
                 width = "100%", paddingLeft = 14, paddingRight = 14, paddingBottom = 8,
@@ -625,6 +625,123 @@ function Screens.CreateGameScreen()
             },
         },
     }
+
+    -- ------------------------------------------------------------------
+    -- 摇骰流程控制
+    -- ------------------------------------------------------------------
+    local diceDone, rollStarted = 0, false
+
+    -- 落定后揭晓结果并放出对话
+    local function FinishRoll()
+        -- 骰子胜负判定
+        local diceResult = GameLogic.GetDiceResult()
+        if diceResult == "tie" then
+            resultLabel:SetText("🍻 平局！干杯事件触发")
+            resultLabel:SetFontColor(C.textYellow)
+        elseif diceResult == "advantage" then
+            resultLabel:SetText("💪 你占优势，主动出击")
+            resultLabel:SetFontColor(C.green)
+        else
+            resultLabel:SetText("😅 对方占优势，小心应对")
+            resultLabel:SetFontColor(C.accent)
+        end
+
+        -- 显示对话区，收起摇骰按钮
+        dialogArea:Show()
+        rollButton:Hide()
+    end
+
+    -- 两颗骰子都落定后才揭晓
+    local function OnDiceComplete()
+        diceDone = diceDone + 1
+        if diceDone >= 2 then
+            FinishRoll()
+        end
+    end
+
+    playerDice.props.onLand = function() PlayDiceSound(true) end
+    opponentDice.props.onLand = function() PlayDiceSound(true) end
+    playerDice.props.onComplete = OnDiceComplete
+    opponentDice.props.onComplete = OnDiceComplete
+
+    -- 点击摇骰：双方同时翻滚
+    rollButton.props.onClick = function()
+        if rollStarted then return end
+        rollStarted = true
+        rollButton:SetDisabled(true)
+        rollButton:SetText("翻滚中…")
+        resultLabel:SetText("骰子翻滚中…")
+        PlayDiceSound(false)
+        playerDice:Roll(playerRoll)
+        opponentDice:Roll(opponentRoll)
+    end
+
+    -- ------------------------------------------------------------------
+    -- 组装界面
+    -- ------------------------------------------------------------------
+    local root = UI.Panel {
+        width = "100%", height = "100%",
+        backgroundColor = C.bgDark,
+        flexDirection = "column",
+        children = {
+            -- HUD
+            CreateHUD(),
+            -- 属性条
+            UI.Panel {
+                width = "100%", paddingLeft = 14, paddingRight = 14, paddingTop = 6, paddingBottom = 6,
+                flexDirection = "row", gap = 8,
+                children = {
+                    UI.Panel { flex = 1, children = { AttrBar("好感", s.favor, C.green) } },
+                    UI.Panel { flex = 1, children = { AttrBar("清醒", s.sober, C.blue) } },
+                    UI.Panel { flex = 1, children = { AttrBar("氛围", s.vibe, C.purple) } },
+                },
+            },
+            -- 骰子对战区（摇骰阶段独占空间并垂直居中）
+            UI.Panel {
+                flex = 1, flexBasis = 0,
+                width = "100%",
+                flexDirection = "column",
+                justifyContent = "center",
+                alignItems = "center",
+                children = {
+                    -- 双方骰子
+                    UI.Panel {
+                        flexDirection = "row",
+                        justifyContent = "center", alignItems = "center",
+                        children = {
+                            playerDice,
+                            UI.Label {
+                                text = "VS", fontSize = 14, fontColor = C.textGray,
+                                marginLeft = 10, marginRight = 10,
+                            },
+                            opponentDice,
+                        },
+                    },
+                    -- 回合提示
+                    UI.Label {
+                        text = "回合 " .. s.round .. "/" .. s.maxRounds,
+                        fontSize = 11, fontColor = C.textGray, textAlign = "center",
+                        marginTop = 4,
+                    },
+                    -- 结果提示
+                    UI.Panel {
+                        width = "100%", paddingTop = 8, paddingBottom = 8,
+                        alignItems = "center",
+                        children = { resultLabel },
+                    },
+                    -- 摇骰按钮
+                    rollButton,
+                },
+            },
+            -- 对话区（摇骰结束后显示）
+            dialogArea,
+        },
+    }
+
+    -- 对话区初始隐藏（构建后再隐藏，确保 Yoga display 同步）
+    dialogArea:Hide()
+
+    return root
 end
 
 -- ============================================================================
