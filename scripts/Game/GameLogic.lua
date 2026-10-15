@@ -110,6 +110,14 @@ GameLogic.State = {
     -- 历史记录
     dayHistory = {},    -- { day=1, result="promote", levelBefore=1, levelAfter=2 }
 
+    -- 单局特殊事件（策划案 §4.3）
+    drinkToastStreak = 0,    -- 连续"干杯事件"选喝次数（成为酒友）
+    diceBonus = 0,           -- 下局骰子永久加成（成为酒友奖励）
+    quitInDrunk = false,     -- 醉酒时选过"说真话"（当场辞职）
+    dignityUnlocked = false, -- 当场辞职后解锁的对话选项
+    bonusRounds = 0,         -- 额外 Bonus 回合（KTV续场）
+    specialEvents = {},      -- 本场触发的特殊事件记录
+
     -- 游戏阶段
     phase = "menu",
     -- menu / select_workplace / select_character /
@@ -158,6 +166,12 @@ function GameLogic.Reset()
     s.peakDignity = 0
     s.peakFavor = 0
     s.peakPro = 0
+    s.drinkToastStreak = 0
+    s.diceBonus = 0
+    s.quitInDrunk = false
+    s.dignityUnlocked = false
+    s.bonusRounds = 0
+    s.specialEvents = {}
     s.liar = { active = false, playerDie = 0, opponentDie = 0, currentBid = 0,
         turn = "player", revealOpponent = false, winner = nil, rounds = 0 }
     s.intel = nil
@@ -672,6 +686,11 @@ function GameLogic.ResetBanquetStats()
     s.budgetFailure = false
     -- 每日情报重置（intel 本身保留，供次日参考）
     s.intelUsedToday = false
+    -- 单局特殊事件：每日重置（diceBonus / dignityUnlocked 跨局保留）
+    s.drinkToastStreak = 0
+    s.quitInDrunk = false
+    s.bonusRounds = 0
+    s.specialEvents = {}
     s.liar = { active = false, playerDie = 0, opponentDie = 0, currentBid = 0,
         turn = "player", revealOpponent = false, winner = nil, rounds = 0 }
     return true
@@ -693,6 +712,11 @@ function GameLogic.StartLiarRound()
     -- 面子值加成：高面子时有概率让玩家骰子更好
     if s.face > 20 and math.random() < 0.2 then
         s.liar.playerDie = math.min(6, s.liar.playerDie + 1)
+    end
+    -- 成为酒友奖励：骰子永久 +1（整局有效）
+    if s.diceBonus > 0 then
+        s.liar.playerDie = math.min(6, s.liar.playerDie + s.diceBonus)
+        print(string.format("[Liar] 酒友加成 +%d", s.diceBonus))
     end
     s.liar.currentBid = 0
     s.liar.turn = "player"
@@ -1158,6 +1182,9 @@ function GameLogic.MakeChoice(choiceIndex, eventId, round)
     print(string.format("[Choice] banquet=%d round=%d %s", s.banquetId, s.round, s.lastChoiceFeedback))
     s.currentEvent = nil -- 本事件只可回答一次；下一次GetNextEvent才生成新事件。
 
+    -- 单局特殊事件检测（策划案 §4.3）
+    GameLogic.CheckSpecialEvents(event, choice)
+
     if s.round >= s.maxRounds or s.sober <= 0 then
         s.phase = "day_result"
     else
@@ -1168,13 +1195,74 @@ function GameLogic.MakeChoice(choiceIndex, eventId, round)
 end
 
 -- ============================================================================
+-- 单局特殊事件（策划案 §4.3）
+-- ============================================================================
+
+--- 记录一条特殊事件（供 UI 展示）
+---@param id string
+---@param text string
+local function PushSpecialEvent(s, id, text)
+    s.specialEvents[#s.specialEvents + 1] = { id = id, text = text }
+    print(string.format("[Special] %s: %s", id, text))
+end
+
+--- 在每次选择后检测特殊事件。
+---@param event table
+---@param choice table
+function GameLogic.CheckSpecialEvents(event, choice)
+    local s = GameLogic.State
+
+    -- 🤝 成为酒友：连续 3 次"干杯事件"都选喝 → 下局骰子永久 +1
+    if event.type == "drink" then
+        local drank = (choice.effects and choice.effects.sober and choice.effects.sober < 0)
+        if drank then
+            s.drinkToastStreak = s.drinkToastStreak + 1
+            if s.drinkToastStreak >= 3 and s.diceBonus == 0 then
+                s.diceBonus = 1
+                PushSpecialEvent(s, "drink_buddy", "成为酒友 · 下局骰子 +1")
+            end
+        else
+            s.drinkToastStreak = 0
+        end
+    end
+
+    -- 💔 当场辞职：醉酒模式下选"说真话" → 视为被优化，但尊严满
+    if event.type == "drunk" and choice.text:find("辞职", 1, true) then
+        s.quitInDrunk = true
+        s.dignityUnlocked = true
+        s.dignity = 100
+        PushSpecialEvent(s, "resign", "当场辞职 · 尊严拉满，下局解锁新选项")
+    end
+
+    -- 🎤 KTV续场：氛围满 + 清醒 > 50% → 额外 Bonus 回合
+    if s.vibe >= 100 and s.sober > 50 and s.bonusRounds == 0 then
+        s.bonusRounds = 2
+        s.maxRounds = s.maxRounds + s.bonusRounds
+        PushSpecialEvent(s, "ktv", "KTV 续场 · 额外 " .. s.bonusRounds .. " 回合，好感 ×1.5")
+    end
+
+    -- 🏥 送医急救：清醒度归零 → 本局强制结束，视为被优化
+    -- （由 GetBanquetResult 的 sober<=0 分支处理，此处仅记录）
+    if s.sober <= 0 then
+        PushSpecialEvent(s, "emergency", "送医急救 · 本局强制结束")
+    end
+end
+
+--- 获取本场触发的特殊事件
+function GameLogic.GetSpecialEvents()
+    return GameLogic.State.specialEvents
+end
+
+-- ============================================================================
 -- 单日结算
 -- ============================================================================
 
 --- 纯数值评分，保留既有权重；可直接在独立Lua环境测试。
 function GameLogic.GetBanquetScore()
     local s = GameLogic.State
-    return s.favor * 0.35 + s.face * 0.2 + s.pro * 0.15 + s.vibe * 0.15
+    -- KTV 续场（氛围满+清醒>50）触发时，好感贡献 ×1.5
+    local favorWeight = s.bonusRounds > 0 and 0.35 * 1.5 or 0.35
+    return s.favor * favorWeight + s.face * 0.2 + s.pro * 0.15 + s.vibe * 0.15
         + (s.sober / 100) * 15 - s.currentLevel * 3
 end
 
@@ -1187,7 +1275,8 @@ function GameLogic.GetBanquetResult()
     local s = GameLogic.State
     local settled = s.settledBanquets[s.banquetId]
     if settled then return settled.result end
-    if s.budgetFailure or s.sober <= 0 then return "optimized" end
+    -- 送医急救（清醒归零）或当场辞职 → 视为被优化
+    if s.budgetFailure or s.sober <= 0 or s.quitInDrunk then return "optimized" end
     local score = GameLogic.GetBanquetScore()
     if score >= GameLogic.GetPromotionThreshold() then
         -- 遭遇乱入挑战者时，须通过其终局问答才算「击败」；但不影响升职判定。
