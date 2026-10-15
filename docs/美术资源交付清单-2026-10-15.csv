@@ -25,12 +25,6 @@ assets/image/Art/Characters/intern_normal.png,Characters,1024,1536,True,runtime,
 assets/image/Art/Characters/intern_portrait.png,Characters,512,512,True,runtime,2026-10-15按用户图三画风重绘的手绘水彩版本；独立PNG，非body/head/face/prop真分层
 assets/image/Art/Characters/pm_normal.png,Characters,768,1152,True,runtime,运行PNG；独立立绘/半身图不等于源文件真分层
 assets/image/Art/Characters/pm_portrait.png,Characters,384,384,True,runtime,从对应基础全身立绘裁切的384px胸像；非独立生图，非源文件分层
-assets/image/Art/Characters/pu_rui_si_body.png,Characters,1024,1536,True,runtime,2026-10-15按用户图三画风重绘的手绘水彩版本；独立PNG，非body/head/face/prop真分层
-assets/image/Art/Characters/pu_rui_si_drunk.png,Characters,512,512,True,runtime,2026-10-15按用户图三画风重绘的手绘水彩版本；独立PNG，非body/head/face/prop真分层
-assets/image/Art/Characters/pu_rui_si_face_final.png,Characters,512,512,True,runtime,2026-10-15按用户图三画风重绘的手绘水彩版本；独立PNG，非body/head/face/prop真分层
-assets/image/Art/Characters/pu_rui_si_portrait.png,Characters,512,512,True,runtime,2026-10-15按用户图三画风重绘的手绘水彩版本；独立PNG，非body/head/face/prop真分层
-assets/image/Art/Characters/pu_rui_si_skeptical.png,Characters,512,512,True,runtime,2026-10-15按用户图三画风重绘的手绘水彩版本；独立PNG，非body/head/face/prop真分层
-assets/image/Art/Characters/pu_rui_si_smile.png,Characters,512,512,True,runtime,2026-10-15按用户图三画风重绘的手绘水彩版本；独立PNG，非body/head/face/prop真分层
 assets/image/Art/Characters/sales_normal.png,Characters,768,1152,True,runtime,运行PNG；独立立绘/半身图不等于源文件真分层
 assets/image/Art/Characters/sales_portrait.png,Characters,384,384,True,runtime,从对应基础全身立绘裁切的384px胸像；非独立生图，非源文件分层
 assets/image/Art/Characters/veteran_normal.png,Characters,768,1152,True,runtime,运行PNG；独立立绘/半身图不等于源文件真分层
@@ -66,11 +60,24 @@ assets/image/Art/Drinks/icon_drink_foreign.png,Drinks,256,256,True,runtime,酒�
 assets/image/Art/Drinks/icon_drink_sake.png,Drinks,256,256,True,runtime,酒水类型图标；不代表品牌专属瓶身立绘
 assets/image/Art/Drinks/icon_drink_tea.png,Drinks,256,256,True,runtime,酒水类型图标；不代表品牌专属瓶身立绘
 assets/image/Art/Drinks/icon_drink_wine.png,Drinks,256,256,True,runtime,酒水类型图标；不代表品牌专属瓶身立绘
+assets/image/Art/Hidden/pu_rui_si_body.png,Hidden,1024,1536,True,runtime,隐藏Boss舞台全身PNG；本轮未改；非body/head/face/prop真分层
+assets/image/Art/Hidden/pu_rui_si_chibi_forced_smile.png,Hidden,768,1152,True,runtime,2026-10-16同一Q版母图局部编辑；除表情/手势蒙版外沿用母图原像素；透明全身PNG；已入包、尚未接入UI；非真分层
+assets/image/Art/Hidden/pu_rui_si_chibi_normal.png,Hidden,768,1152,True,runtime,2026-10-16同一Q版母图局部编辑；除表情/手势蒙版外沿用母图原像素；透明全身PNG；已入包、尚未接入UI；非真分层
+assets/image/Art/Hidden/pu_rui_si_chibi_shocked.png,Hidden,768,1152,True,runtime,2026-10-16同一Q版母图局部编辑；除表情/手势蒙版外沿用母图原像素；透明全身PNG；已入包、尚未接入UI；非真分层
+assets/image/Art/Hidden/pu_rui_si_chibi_smug.png,Hidden,768,1152,True,runtime,2026-10-16同一Q版母图局部编辑；除表情/手势蒙版外沿用母图原像素；透明全身PNG；已入包、尚未接入UI；非真分层
+assets/image/Art/Hidden/pu_rui_si_chibi_toast.png,Hidden,768,1152,True,runtime,2026-10-16同一Q版母图局部编辑；除表情/手势蒙版外沿用母图原像素；透明全身PNG；已入包、尚未接入UI；非真分层
+assets/image/Art/Hidden/pu_rui_si_drunk.png,Hidden,768,768,True,runtime,2026-10-16同一半身母图局部编辑并几何对齐；非表情编辑区保留母图原像素；透明整张半身状态PNG；非body/head/face/prop真分层
+assets/image/Art/Hidden/pu_rui_si_face_final.png,Hidden,768,768,True,runtime,2026-10-16同一半身母图局部编辑并几何对齐；非表情编辑区保留母图原像素；透明整张半身状态PNG；非body/head/face/prop真分层
+assets/image/Art/Hidden/pu_rui_si_final.png,Hidden,768,768,True,runtime,2026-10-16同一半身母图局部编辑并几何对齐；非表情编辑区保留母图原像素；透明整张半身状态PNG；非body/head/face/prop真分层
+assets/image/Art/Hidden/pu_rui_si_forced_smile.png,Hidden,768,768,True,runtime,2026-10-16同一半身母图局部编辑并几何对齐；非表情编辑区保留母图原像素；透明整张半身状态PNG；非body/head/face/prop真分层；新增扩展状态暂未接入UI
+assets/image/Art/Hidden/pu_rui_si_normal.png,Hidden,768,768,True,runtime,2026-10-16同一半身母图局部编辑并几何对齐；非表情编辑区保留母图原像素；透明整张半身状态PNG；非body/head/face/prop真分层
+assets/image/Art/Hidden/pu_rui_si_portrait.png,Hidden,768,768,True,runtime,2026-10-16同一半身母图局部编辑并几何对齐；非表情编辑区保留母图原像素；透明整张半身状态PNG；非body/head/face/prop真分层
+assets/image/Art/Hidden/pu_rui_si_shocked.png,Hidden,768,768,True,runtime,2026-10-16同一半身母图局部编辑并几何对齐；非表情编辑区保留母图原像素；透明整张半身状态PNG；非body/head/face/prop真分层；新增扩展状态暂未接入UI
+assets/image/Art/Hidden/pu_rui_si_skeptical.png,Hidden,768,768,True,runtime,2026-10-16同一半身母图局部编辑并几何对齐；非表情编辑区保留母图原像素；透明整张半身状态PNG；非body/head/face/prop真分层
+assets/image/Art/Hidden/pu_rui_si_smile.png,Hidden,768,768,True,runtime,2026-10-16同一半身母图局部编辑并几何对齐；非表情编辑区保留母图原像素；透明整张半身状态PNG；非body/head/face/prop真分层
 assets/image/Art/NPC/client_normal.png,NPC,768,768,True,runtime,运行PNG；独立立绘/半身图不等于源文件真分层
 assets/image/Art/NPC/colleague_normal.png,NPC,768,768,True,runtime,运行PNG；独立立绘/半身图不等于源文件真分层
 assets/image/Art/NPC/leader_normal.png,NPC,1024,1024,True,runtime,运行PNG；独立立绘/半身图不等于源文件真分层
-assets/image/Art/NPC/pu_rui_si_final.png,NPC,512,512,True,runtime,2026-10-15按用户图三画风重绘的手绘水彩版本；独立PNG，非body/head/face/prop真分层
-assets/image/Art/NPC/pu_rui_si_normal.png,NPC,512,512,True,runtime,2026-10-15按用户图三画风重绘的手绘水彩版本；独立PNG，非body/head/face/prop真分层
 assets/image/Art/References/generation_masters/dish_sheet_a.png,generation_masters,1536,1536,True,excluded,参考或制作母图，不入运行包
 assets/image/Art/References/generation_masters/dish_sheet_b.png,generation_masters,1536,1536,True,excluded,参考或制作母图，不入运行包
 assets/image/Art/References/generation_masters/dish_sheet_c.png,generation_masters,1024,1024,True,excluded,参考或制作母图，不入运行包
@@ -78,8 +85,59 @@ assets/image/Art/References/generation_masters/ui_button_primary.png,generation_
 assets/image/Art/References/generation_masters/ui_button_secondary.png,generation_masters,512,768,True,excluded,参考或制作母图，不入运行包
 assets/image/Art/References/generation_masters/ui_panel_paper.png,generation_masters,512,512,True,excluded,参考或制作母图，不入运行包
 assets/image/Art/References/generation_masters/ui_rank_sheet.png,generation_masters,1024,1536,True,excluded,参考或制作母图，不入运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/chibi_forced_smile.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/chibi_normal.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/chibi_shocked.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/chibi_smug.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/chibi_toast.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/portrait_drunk.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/portrait_final.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/portrait_forced_smile.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/portrait_normal.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/portrait_shocked.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/portrait_skeptical.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/aligned_delivery/portrait_smile.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/chibi_crop.png,References,113,161,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/chibi_edit_mask.png,References,768,1152,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/chibi_master.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/chibi_overview.png,References,1275,548,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/portrait_crop.png,References,170,147,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/portrait_drunk_edit_mask.png,References,768,768,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/portrait_edit_mask.png,References,768,768,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/portrait_master.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/portrait_overview.png,References,1200,798,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/previous_runtime/Characters_pu_rui_si_drunk.png,References,512,512,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/previous_runtime/Characters_pu_rui_si_face_final.png,References,512,512,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/previous_runtime/Characters_pu_rui_si_portrait.png,References,512,512,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/previous_runtime/Characters_pu_rui_si_skeptical.png,References,512,512,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/previous_runtime/Characters_pu_rui_si_smile.png,References,512,512,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/previous_runtime/NPC_pu_rui_si_final.png,References,512,512,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/previous_runtime/NPC_pu_rui_si_normal.png,References,512,512,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_chibi_forced_smile_20261015060707.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_chibi_master_20261015055819.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_chibi_shocked_20261015060633.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_chibi_smug_20261015060557.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_chibi_toast_20261015060749.png,References,768,1152,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_local_drunk_20261015060134.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_local_final_20261015060316.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_local_forced_smile_20261015060445.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_local_shocked_20261015060524.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_local_skeptical_20261015060049.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_local_smile_20261015060010.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/raw_edits/edited_pu_rui_si_portrait_master_20261015055749.png,References,768,768,True,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/uploaded_chibi_design.png,References,218,181,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/uploaded_chibi_small.png,References,157,176,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
+assets/image/Art/References/pu_rui_si_expression_source/uploaded_portrait_expressions.png,References,370,324,False,excluded,2026-10-16上传原图/固定母图/编辑蒙版/局部差分源图/对齐记录/预览归档；由Art/References目录规则排除出运行包
 assets/image/Art/References/pu_rui_si_reference.png,References,1536,1024,False,excluded,参考或制作母图，不入运行包
 assets/image/Art/References/pu_rui_si_reference_final.png,References,1536,1024,False,excluded,参考或制作母图，不入运行包
+assets/image/Art/References/ui_afterhours/banquet_ui_felt_panel_20261015185010.png,References,512,512,True,excluded,2026-10-16 GPT界面制作原图；由References目录规则排除出运行包
+assets/image/Art/References/ui_afterhours/banquet_ui_gold_button_20261015185006.png,References,768,512,True,excluded,2026-10-16 GPT界面制作原图；由References目录规则排除出运行包
+assets/image/Art/References/ui_afterhours/banquet_ui_hidden_dice_cup_20261015185010.png,References,256,384,True,excluded,2026-10-16 GPT界面制作原图；由References目录规则排除出运行包
+assets/image/Art/References/ui_afterhours/banquet_ui_paper_panel_20261015185012.png,References,512,512,True,excluded,2026-10-16 GPT界面制作原图；由References目录规则排除出运行包
+assets/image/Art/UI/AfterHours/dice_cup.png,UI,232,259,True,runtime,2026-10-16 GPT独立生成并裁切；纸卡/绒面骰桌/金色按钮/透明骰盅，文字由引擎绘制
+assets/image/Art/UI/AfterHours/felt_panel.png,UI,512,512,True,runtime,2026-10-16 GPT独立生成并裁切；纸卡/绒面骰桌/金色按钮/透明骰盅，文字由引擎绘制
+assets/image/Art/UI/AfterHours/gold_button.png,UI,512,136,True,runtime,2026-10-16 GPT独立生成并裁切；纸卡/绒面骰桌/金色按钮/透明骰盅，文字由引擎绘制
+assets/image/Art/UI/AfterHours/paper_panel.png,UI,512,512,True,runtime,2026-10-16 GPT独立生成并裁切；纸卡/绒面骰桌/金色按钮/透明骰盅，文字由引擎绘制
 assets/image/Art/UI/ui_attr_icons_sheet.png,UI,512,512,True,excluded,参考或制作母图，不入运行包
 assets/image/Art/UI/ui_badge_lv1.png,UI,192,192,True,runtime,运行PNG；独立立绘/半身图不等于源文件真分层
 assets/image/Art/UI/ui_badge_lv2.png,UI,192,192,True,runtime,运行PNG；独立立绘/半身图不等于源文件真分层

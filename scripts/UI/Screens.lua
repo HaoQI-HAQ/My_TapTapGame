@@ -35,21 +35,75 @@ local function HUD()
     return Art.HUD(s, GameLogic.GetLevelData(s.currentLevel).name)
 end
 
+-- 页面标题与内容分层，短横屏缩减装饰而不挤压滚动区域。
 local function Heading(kicker, title, subtitle)
-    return UI.Panel {width = "100%", padding = 16, gap = 5, children = {
-        Art.Text(kicker, 10, C.purple, {letterSpacing = 2}),
-        Art.Text(title, 25, C.ink, {fontWeight = "bold"}),
-        Art.Text(subtitle, 12, C.muted, {width = "100%"}),
-    }}
+    local headline = Art.Title(title, 27, C.paper, {width = "100%"})
+    local caption = Art.Text(subtitle, 12, C.paper, {width = "100%", opacity = 0.78})
+    local eyebrow = Art.Text(kicker, 10, C.yellow, {letterSpacing = 1})
+    local panel = UI.Panel {width = "100%", paddingHorizontal = 24, paddingVertical = 16, gap = 5,
+        backgroundColor = C.dark, children = {eyebrow, headline, caption}}
+    return panel, headline, caption, eyebrow
 end
 
 local function Sheet(title, subtitle, children, background)
-    local card = Art.Paper(children, {width = "100%", maxWidth = 660, alignSelf = "center", padding = 22, gap = 14})
-    local body = UI.Panel {width = "100%", padding = 18, gap = 12, children = {card}}
-    local heading = Heading("AFTER HOURS / 酒桌手记", title, subtitle)
-    heading:SetStyle({backgroundColor = {246, 239, 220, 238}})
-    return Art.Root({Art.Safe({heading,
-        UI.ScrollView {width = "100%", flexGrow = 1, flexBasis = 0, scrollY = true, children = {body}}})}, background)
+    local body = UI.Panel {width = "100%", maxWidth = 1080, alignSelf = "center", padding = 24, gap = 16,
+        children = children}
+    local heading, headline, caption, eyebrow = Heading("酒桌文化 / 我的手记", title, subtitle)
+    local root = Art.Root({Art.Safe({heading,
+        UI.ScrollView {width = "100%", flexGrow = 1, flexBasis = 0, flexShrink = 1, minHeight = 0,
+            scrollY = true, children = {body}}})}, background)
+    return Art.Responsive(root, function(w, h)
+        local compact = h < 550
+        body:SetStyle({padding = w < 620 and 14 or 24, gap = compact and 12 or 16})
+        heading:SetStyle({paddingHorizontal = w < 620 and 18 or 24, paddingVertical = compact and 9 or 16})
+        headline:SetFontSize(compact and 21 or 27)
+        caption:SetFontSize(compact and 11 or 12)
+        eyebrow:SetVisible(not compact)
+    end)
+end
+
+local function TwoColumns(left, right)
+    return UI.SimpleGrid {width = "100%", minColumnWidth = 330, gap = 16,
+        children = {left, right}}
+end
+
+local function Metric(label, value, color)
+    return UI.Panel {flexGrow = 1, flexShrink = 1, flexBasis = 0, minWidth = 100, padding = 12,
+        backgroundColor = C.lilac, borderRadius = 10, gap = 5, children = {
+            Art.Text(label, 11, C.muted, {width = "100%"}),
+            Art.Title(tostring(value), 20, color or C.ink, {width = "100%"}),
+        }}
+end
+
+local function Profile(state)
+    return UI.Panel {width = "100%", flexDirection = "row", alignItems = "center", gap = 14, children = {
+        Art.Picture(Art.Character(state.character, true), {width = 74, height = 90}),
+        UI.Panel {flexGrow = 1, flexBasis = 0, flexShrink = 1, minWidth = 0, gap = 5, children = {
+            Art.Title((state.character or {}).name, 22, C.ink, {width = "100%"}),
+            Art.Text((state.workplace or {}).name, 12, C.muted, {width = "100%"}),
+            Art.Text("Lv." .. state.currentLevel .. " · " .. GameLogic.GetLevelData(state.currentLevel).name,
+                13, C.purple, {width = "100%"}),
+        }},
+    }}
+end
+
+local prepSteps = {"职场", "身份", "场地", "酒类", "品牌", "菜品"}
+local prepIndex = {workplace = 1, character = 2, restaurant = 3, drink = 4, brand = 5, dish = 6}
+
+local function Preparation(kind)
+    local current = prepIndex[kind] or 1
+    local steps = {}
+    for i, name in ipairs(prepSteps) do
+        local active, done = i == current, i < current
+        steps[#steps + 1] = UI.Panel {flexGrow = 1, flexBasis = 0, flexShrink = 1, minWidth = 0, gap = 6, children = {
+            UI.Panel {width = "100%", height = 3, borderRadius = 2,
+                backgroundColor = (active or done) and C.yellow or C.lilac},
+            Art.Text(name, 11, active and C.purple or C.muted,
+                {width = "100%", textAlign = "center", fontWeight = active and "bold" or "normal", whiteSpace = "nowrap"}),
+        }}
+    end
+    return UI.Panel {width = "100%", paddingHorizontal = 20, paddingVertical = 11,
+        backgroundColor = C.paper, flexDirection = "row", gap = 8, children = steps}
 end
 
 function Screens.CreateMainMenu()
@@ -58,7 +112,7 @@ function Screens.CreateMainMenu()
         GameLogic.StartNewGame()
         Navigate("select_workplace")
     end, function()
-        UI.SetRoot(Screens.CreateArtGallery(), true)
+        Navigate("art_gallery")
     end, function()
         Navigate("dice_demo")
     end)
@@ -82,7 +136,7 @@ local function Details(item, kind)
     local tag = ""
     if kind == "character" then
         tag = "Lv." .. item.startLevel .. " 起步"
-        info = (item.desc or "") .. "\n【" .. (item.skill or "专属技能") .. "】" .. (item.skillDesc or "")
+        info = "技能 · " .. (item.skill or "专属技能") .. "\n" .. (item.skillDesc or "")
     elseif kind == "workplace" then
         tag = "难度 " .. (item.difficulty or 1) .. " / 5"
     elseif kind == "restaurant" then
@@ -96,7 +150,7 @@ local function Details(item, kind)
         info = "面子 +" .. (item.face or 0) .. "  氛围 +" .. (item.vibe or 0) .. "\n清醒 +" .. (item.sober or 0)
     elseif item.price then
         tag = "¥" .. item.price
-        info = info .. "\n面子 +" .. (item.face or 0)
+        info = (item.special or info) .. "\n面子 +" .. (item.face or 0)
     end
     return tag, info
 end
@@ -127,25 +181,31 @@ local function BudgetNotice()
 end
 
 local function Selection(title, subtitle, items, kind, onSelect, withHUD)
-    local cards = {}
+    local cards, layouts = {}, {}
     local selected = false
     for index, item in ipairs(items or {}) do
         local path, fit = Visual(item, kind)
         local tag, description = Details(item, kind)
-        local picture = Art.Picture(path, {width = "100%", height = kind == "character" and 190 or 132, backgroundFit = fit})
-        local imageMat = UI.Panel {width = "100%", height = kind == "character" and 190 or 132,
-            backgroundColor = C.lilac, overflow = "hidden", pointerEvents = "none", children = {picture,
-                Art.Text(string.format("%02d", index), 11, C.ink, {position = "absolute", top = 5, left = 6,
-                    width = 28, minWidth = 28, textAlign = "center", paddingHorizontal = 0, backgroundColor = C.yellow})}}
         local unaffordable = item.affordable == false
-        local card = Art.Paper({imageMat,
-            Art.Text(item.name, 17, unaffordable and C.muted or C.ink, {fontWeight = "bold", width = "100%"}),
-            Art.Text(tag, 12, unaffordable and C.muted or C.purple, {fontWeight = "bold", width = "100%"}),
-            Art.Text(description, 12, C.muted, {width = "100%"}),
-            Art.Text(unaffordable and "余额不足 · 点击查看" or "选择这张  →", 11, unaffordable and C.red or C.ink,
-                {alignSelf = "flex-end", minWidth = unaffordable and 140 or 90,
-                    backgroundColor = unaffordable and C.lilac or C.yellow, padding = 4}),
-        }, {padding = 10, gap = 7, minWidth = 0, pointerEvents = "box-only", id = kind .. "_" .. (item.id or index),
+        local imageMat = Art.Picture(path, {width = "100%", height = 164, backgroundFit = fit,
+            borderRadius = 10, overflow = "hidden"})
+        local descriptionLabel = Art.Text(description, 12, C.muted, {width = "100%", lineHeight = 1.55})
+        local info = UI.Panel {width = "100%", gap = 7, minWidth = 0, children = {
+            Art.Title(item.name, 20, unaffordable and C.muted or C.ink, {width = "100%"}),
+            Art.Text(tag, 12, unaffordable and C.red or C.purple, {width = "100%", fontWeight = "bold"}),
+            descriptionLabel,
+        }}
+        if kind == "brand" and item.thumbnailLabel then
+            info:AddChild(Art.Text(item.thumbnailLabel, 10, C.muted, {width = "100%", lineHeight = 1.4}))
+        end
+        info:AddChild(UI.Panel {width = "100%", marginTop = 5, flexDirection = "row", alignItems = "center",
+            justifyContent = "space-between", gap = 6, children = {
+                Art.Text(unaffordable and "余额不足 · 查看原因" or "确认选择", 12,
+                    unaffordable and C.red or C.purple, {flexGrow = 1, flexBasis = 0, flexShrink = 1}),
+                Art.Title("→", 20, unaffordable and C.muted or C.purple, {width = 28, textAlign = "right"}),
+            }})
+        local card = Art.Paper({imageMat, info}, {padding = 14, gap = 13, minWidth = 0,
+            pointerEvents = "box-only", id = kind .. "_" .. (item.id or index),
             onClick = function()
                 if selected then return end
                 selected = true
@@ -153,23 +213,47 @@ local function Selection(title, subtitle, items, kind, onSelect, withHUD)
                 selected = false
             end,
             onPointerEnter = function(_, widget) widget:SetStyle({borderColor = C.purple, translateY = -2}) end,
-            onPointerLeave = function(_, widget) widget:SetStyle({borderColor = C.ink, translateY = 0}) end,
-            transition = "translateY 0.12s easeOut"})
+            onPointerLeave = function(_, widget) widget:SetStyle({borderColor = C.line, translateY = 0}) end,
+            transition = "translateY 0.12s easeOut, borderColor 0.12s easeOut"})
         cards[#cards + 1] = card
+        layouts[#layouts + 1] = {card = card, image = imageMat, info = info, description = descriptionLabel}
     end
-    if #cards == 0 then cards[1] = Art.Paper({Art.Text("暂时没有可选项。", 15), Art.Text("请确认数据接口已就绪。", 12, C.muted)}) end
-    local grid = UI.SimpleGrid {width = "100%", minColumnWidth = 210, gap = 14, children = cards}
-    local list = UI.Panel {width = "100%", padding = 18, paddingBottom = 30, children = {grid}}
+    if #cards == 0 then
+        cards[1] = Art.Paper({Art.Title("暂时没有可选项", 18), Art.Text("请确认数据接口已就绪。", 12, C.muted)})
+    end
+    local grid = UI.SimpleGrid {width = "100%", minColumnWidth = 290, gap = 16, children = cards}
+    local list = UI.Panel {width = "100%", maxWidth = 1200, alignSelf = "center", padding = 22, gap = 16}
+    local budget = withHUD and BudgetNotice() or nil
+    if budget then list:AddChild(budget) end
+    list:AddChild(grid)
+    local heading, headline, caption, eyebrow = Heading("赴宴准备 · " .. (prepIndex[kind] or 1) .. " / 6", title, subtitle)
+    local progress = Preparation(kind)
     local children = {}
     if withHUD then children[#children + 1] = HUD() end
-    children[#children + 1] = Heading("PREPARATION / 赴宴准备", title, subtitle)
-    children[#children + 1] = UI.ScrollView {width = "100%", flexGrow = 1, flexBasis = 0, scrollY = true,
-        showScrollbar = true, children = {list}}
-    local budget = withHUD and BudgetNotice() or nil
-    if budget then children[#children + 1] = budget end
-    children[#children + 1] = Art.Text("向下滚动查看更多 · 点击照片卡片确认选择", 10, C.muted,
-        {width = "100%", textAlign = "center", padding = 8})
-    return Art.Root({Art.Safe(children)})
+    children[#children + 1] = heading
+    children[#children + 1] = progress
+    children[#children + 1] = UI.ScrollView {width = "100%", flexGrow = 1, flexBasis = 0, flexShrink = 1,
+        minHeight = 0, scrollY = true, showScrollbar = true, children = {list}}
+    local root = Art.Root({Art.Safe(children)})
+    return Art.Responsive(root, function(w, h)
+        local narrow, compact = w < 650, h < 550
+        heading:SetStyle({paddingHorizontal = narrow and 18 or 24, paddingVertical = compact and 8 or 16})
+        headline:SetFontSize(compact and 21 or 27)
+        caption:SetFontSize(compact and 11 or 12)
+        eyebrow:SetVisible(not compact)
+        progress:SetStyle({paddingVertical = compact and 7 or 11, paddingHorizontal = narrow and 14 or 24})
+        list:SetStyle({padding = narrow and 14 or 22, paddingBottom = 24})
+        for _, layout in ipairs(layouts) do
+            local row = narrow
+            layout.card:SetStyle({flexDirection = row and "row" or "column", alignItems = row and "center" or "stretch",
+                padding = compact and 12 or 14, gap = row and 14 or 12})
+            layout.image:SetStyle({width = row and (kind == "character" and 122 or 110) or "100%",
+                height = row and (kind == "character" and 180 or 135) or (compact and 116 or (kind == "character" and 190 or 164))})
+            layout.info:SetStyle({width = row and "auto" or "100%", flexGrow = 1, flexShrink = 1,
+                flexBasis = row and 0 or "auto"})
+            layout.description:SetStyle({minHeight = row and 0 or (kind == "character" and 83 or 56)})
+        end
+    end)
 end
 
 function Screens.CreateWorkplaceSelect()
@@ -231,49 +315,61 @@ end
 
 function Screens.CreateDayStart()
     local s = GameLogic.State
-    local character, workplace = s.character or {}, s.workplace or {}
+    local character = s.character or {}
     local progress = {}
     for day = 1, s.maxDays do
-        progress[#progress + 1] = UI.Panel {width = 34, height = 34, alignItems = "center", justifyContent = "center",
-            backgroundColor = day == s.currentDay and C.yellow or (day < s.currentDay and C.lilac or C.paper),
-            borderWidth = 2, borderColor = C.ink, children = {Art.Text(tostring(day), 13)}}
+        progress[#progress + 1] = UI.Panel {flexGrow = 1, flexShrink = 1, flexBasis = 0,
+            minWidth = 30, gap = 6, alignItems = "center", children = {
+                UI.Panel {width = "100%", height = 4, borderRadius = 2,
+                    backgroundColor = day <= s.currentDay and C.yellow or C.lilac},
+                Art.Text("第" .. day .. "天", 11, day == s.currentDay and C.purple or C.muted,
+                    {width = "100%", textAlign = "center"}),
+            }}
     end
-    local body = {
-        UI.Panel {flexDirection = "row", flexWrap = "wrap", gap = 8, children = progress},
-        UI.Panel {flexDirection = "row", alignItems = "center", gap = 16, children = {
-            Art.Picture(Art.Character(character, true), {width = 86, height = 104}),
-            UI.Panel {flexGrow = 1, flexShrink = 1, flexBasis = 0, gap = 5, children = {
-                Art.Text(character.name, 23, C.ink, {fontWeight = "bold"}),
-                Art.Text(workplace.name, 13, C.muted),
-                Art.Text("Lv." .. s.currentLevel .. " " .. GameLogic.GetLevelData(s.currentLevel).name, 14, C.purple),
-            }}, Art.Badge(s.currentLevel, 58)}},
-        Art.StatRow("今日预算", "¥" .. s.money),
-        Art.StatRow("被优化次数", s.optimizeCount .. " / " .. s.maxOptimize, s.optimizeCount > 0 and C.red or C.muted),
-        Art.Text((character.skill or "专属技能") .. " / " .. (character.skillDesc or ""), 13, C.muted),
+    local identity = Art.Paper({Profile(s),
+        UI.Panel {width = "100%", height = 1, backgroundColor = C.line},
+        Art.Title(character.skill or "专属技能", 16, C.purple),
+        Art.Text(character.skillDesc or "", 13, C.muted, {width = "100%", lineHeight = 1.6}),
+    }, {minWidth = 0, padding = 20, gap = 14})
+    local briefing = {Art.Title("今日赴宴备忘", 19, C.ink),
+        UI.Panel {width = "100%", flexDirection = "row", flexWrap = "wrap", gap = 10, children = {
+            Metric("可用预算", "¥" .. s.money),
+            Metric("被优化次数", s.optimizeCount .. " / " .. s.maxOptimize, s.optimizeCount > 0 and C.red or C.purple),
+        }},
+        Art.Text("选好场地、酒水与菜品，再开始今天的饭局。", 13, C.muted, {width = "100%"}),
     }
-    -- 昨日赢得话语权问到的情报，供今日选酒/选菜/选场地参考
+    -- 昨日情报只读展示，为今日选酒、选菜与场地提供参考。
     local intel = GameLogic.GetIntel()
     if intel then
         local personality = GameLogic.GetPersonality(intel.personality)
-        body[#body + 1] = UI.Panel {width = "100%", padding = 10, gap = 4,
-            backgroundColor = C.lilac, borderWidth = 2, borderColor = C.ink, children = {
-                Art.Text("昨日情报 · " .. personality.name, 13, C.purple, {fontWeight = "bold"}),
-                Art.Text(intel.answer, 14, C.ink),
-                Art.Text("线索：" .. intel.tag, 12, C.muted),
+        briefing[#briefing + 1] = UI.Panel {width = "100%", padding = 14, gap = 7,
+            backgroundColor = C.lilac, borderRadius = 10, children = {
+                Art.Title("昨日情报 · " .. personality.name, 15, C.purple, {width = "100%"}),
+                Art.Text(intel.answer, 14, C.ink, {width = "100%", lineHeight = 1.6}),
+                Art.Text("线索：" .. intel.tag, 12, C.muted, {width = "100%"}),
             }}
     end
-    body[#body + 1] = Art.Button("出发赴宴  →", function() GameLogic.StartDay(); Navigate(s.phase) end)
-    return Sheet("第 " .. s.currentDay .. " 天", "新的饭局，新的生存机会。", body)
+    return Sheet("第 " .. s.currentDay .. " 天 · 出门之前", "新的饭局，新的生存机会。", {
+        Art.Paper({UI.Panel {width = "100%", flexDirection = "row", gap = 10, children = progress}},
+            {width = "100%", padding = 14}),
+        TwoColumns(identity, Art.Paper(briefing, {minWidth = 0, padding = 20, gap = 14})),
+        Art.Button("准备好了，出发赴宴  →", function() GameLogic.StartDay(); Navigate(s.phase) end,
+            false, {width = "100%", minHeight = 52}),
+    })
 end
 
 function Screens.CreateRestDay()
     local s = GameLogic.State
     local messages = GameData.RestDayMessages
-    return Sheet("今天，不上酒桌", "DAY " .. s.currentDay .. " / " .. s.maxDays .. " · 休息日", {
-        Art.Picture(A.drinks.tea, {width = 110, height = 110, alignSelf = "center"}),
-        Art.Text(messages[math.random(1, #messages)], 20, C.ink, {width = "100%", textAlign = "center"}),
-        Art.Text("职级不变。偶尔离开饭局，也是生存策略。", 13, C.muted),
-        Art.Button("好好休息，明天继续", function() GameLogic.EndRestDay(); Navigate(s.phase) end, true),
+    return Sheet("今天，不上酒桌", "第 " .. s.currentDay .. " / " .. s.maxDays .. " 天 · 休息日", {
+        Art.Paper({
+            Art.Picture(A.drinks.tea, {width = 140, height = 140, alignSelf = "center"}),
+            Art.Title(messages[math.random(1, #messages)], 23, C.ink, {width = "100%", textAlign = "center", lineHeight = 1.5}),
+            Art.Text("职级不变。偶尔离开饭局，也是生存策略。", 13, C.muted,
+                {width = "100%", textAlign = "center"}),
+            Art.Button("好好休息，明天继续", function() GameLogic.EndRestDay(); Navigate(s.phase) end,
+                false, {width = "100%", marginTop = 10}),
+        }, {width = "100%", maxWidth = 680, alignSelf = "center", padding = 24, gap = 16}),
     }, Art.Background({id = "flyshop"}))
 end
 
@@ -293,19 +389,31 @@ function Screens.CreateDayResult()
     end
     local labels = {promote = "升职通知", maintain = "平稳落席", demote = "岗位调整", optimized = "优化预警"}
     local colors = {promote = C.green, maintain = C.purple, demote = C.red, optimized = C.red}
-    return Sheet(labels[resultCache.result] or "饭局结算", "第 " .. s.currentDay .. " 天 · 饭局复盘", {
-        UI.Panel {flexDirection = "row", alignItems = "center", gap = 12, children = {
-            Art.Picture(Art.Character(s.character, true), {width = 82, height = 96}),
-            Art.Badge(resultCache.before, 64), Art.Text("→", 26, C.purple), Art.Badge(resultCache.after, 72),
+    local summary = Art.Paper({
+        Profile(s),
+        Art.Title(resultCache.message, 25, colors[resultCache.result], {width = "100%", lineHeight = 1.45}),
+        UI.Panel {width = "100%", padding = 14, gap = 7, borderRadius = 10, backgroundColor = C.lilac, children = {
+            Art.Text("本日职级变动", 11, C.muted),
+            Art.Title("Lv." .. resultCache.before .. "  →  Lv." .. resultCache.after, 28, C.purple),
+            Art.Text(GameLogic.GetLevelData(resultCache.before).name .. " → " ..
+                GameLogic.GetLevelData(resultCache.after).name, 13, C.ink, {width = "100%"}),
         }},
-        Art.Text(resultCache.message, 23, colors[resultCache.result], {fontWeight = "bold", width = "100%"}),
-        Art.Text("Lv." .. resultCache.before .. " " .. GameLogic.GetLevelData(resultCache.before).name .. "  →  Lv." ..
-            resultCache.after .. " " .. GameLogic.GetLevelData(resultCache.after).name, 14, C.purple, {width = "100%"}),
-        Art.Text((s --[[@as table]]).lastChoiceFeedback or "饭局结束，记得照顾好自己。", 13, C.muted),
+        Art.Text((s --[[@as table]]).lastChoiceFeedback or "饭局结束，记得照顾好自己。", 13, C.muted,
+            {width = "100%", lineHeight = 1.65}),
+    }, {minWidth = 0, padding = 22, gap = 16})
+    local details = Art.Paper({
+        Art.Title("散席复盘", 19, C.ink),
         Art.Stats(s, true),
-        Art.StatRow("被优化次数", s.optimizeCount .. " / " .. s.maxOptimize, s.optimizeCount > 0 and C.red or C.muted),
-        Art.StatRow("剩余资金", "¥" .. s.money),
-        Art.Button("收好工牌，继续  →", function() GameLogic.ProceedAfterResult(); Navigate(s.phase) end),
+        UI.Panel {width = "100%", flexDirection = "row", flexWrap = "wrap", gap = 10, children = {
+            Metric("剩余资金", "¥" .. s.money),
+            Metric("被优化次数", s.optimizeCount .. " / " .. s.maxOptimize, s.optimizeCount > 0 and C.red or C.purple),
+        }},
+        Art.Text("把今天的得失记下，下一场继续从容入席。", 12, C.muted, {width = "100%"}),
+    }, {minWidth = 0, padding = 22, gap = 18})
+    return Sheet(labels[resultCache.result] or "饭局结算", "第 " .. s.currentDay .. " 天 · 饭局复盘", {
+        TwoColumns(summary, details),
+        Art.Button("收好工牌，继续  →", function() GameLogic.ProceedAfterResult(); Navigate(s.phase) end,
+            false, {width = "100%", minHeight = 52}),
     }, Art.Background(s.restaurant))
 end
 
@@ -322,55 +430,72 @@ function Screens.CreateGameOver()
         headline, description = rating.title or rating.label, rating.msg
     end
     ---@type Widget[]
-    local history = {Art.Text("每日手记 / CAREER LOG", 13, C.purple, {fontWeight = "bold"})}
+    local history = {Art.Title("每日手记", 20, C.ink),
+        Art.Text("每次落座，都留下了一点改变。", 12, C.muted, {width = "100%"})}
     local resultNames = {promote = "升职", maintain = "维持", demote = "降级", optimized = "被优化", rest = "休息"}
+    local resultColors = {promote = C.green, maintain = C.purple, demote = C.red, optimized = C.red, rest = C.muted}
     for _, item in ipairs(s.dayHistory) do
-        history[#history + 1] = Art.StatRow("DAY " .. item.day .. " · " .. (resultNames[item.result] or item.result),
-            "Lv." .. item.levelBefore .. " → " .. item.levelAfter)
+        local color = resultColors[item.result] or C.purple
+        history[#history + 1] = UI.Panel {width = "100%", flexDirection = "row", alignItems = "center", gap = 12,
+            paddingVertical = 11, borderBottomWidth = 1, borderBottomColor = C.line, children = {
+                UI.Panel {width = 40, height = 40, borderRadius = 20, backgroundColor = C.lilac,
+                    justifyContent = "center", alignItems = "center", children = {
+                        Art.Title(tostring(item.day), 17, C.purple, {width = "100%", textAlign = "center"})}},
+                UI.Panel {flexGrow = 1, flexBasis = 0, flexShrink = 1, minWidth = 0, gap = 3, children = {
+                    Art.Title(resultNames[item.result] or item.result, 15, color, {width = "100%"}),
+                    Art.Text(GameLogic.GetLevelData(item.levelBefore).name .. " → " ..
+                        GameLogic.GetLevelData(item.levelAfter).name, 11, C.muted, {width = "100%"}),
+                }},
+                Art.Text("Lv." .. item.levelBefore .. " → " .. item.levelAfter, 12, C.purple,
+                    {width = 90, textAlign = "right", whiteSpace = "nowrap"}),
+            }}
     end
-    local record = Art.Paper(history, {width = "100%", padding = 12, gap = 9})
-    return Sheet(headline, description, {
-        UI.Panel {flexDirection = "row", gap = 16, alignItems = "center", children = {
-            Art.Picture(Art.Character(s.character, true), {width = 96, height = 114}),
-            UI.Panel {flexGrow = 1, flexShrink = 1, flexBasis = 0, gap = 5, children = {
-                Art.Text((s.character or {}).name, 21, C.ink, {fontWeight = "bold"}),
-                Art.Text((s.workplace or {}).name, 13, C.muted),
-                Art.Text("最终 Lv." .. s.currentLevel .. " " .. GameLogic.GetLevelData(s.currentLevel).name, 14, C.purple),
-            }}, Art.Badge(s.currentLevel, 72)}},
+    if #s.dayHistory == 0 then history[#history + 1] = Art.Text("这本手记，还在等待第一场饭局。", 13, C.muted) end
+    local record = Art.Paper(history, {minWidth = 0, padding = 20, gap = 10})
+    local summary = Art.Paper({Profile(s),
         Art.Paper({Art.Text("本次获得称号", 11, C.yellow),
-            Art.Text(title.name, 26, C.paper, {fontWeight = "bold", width = "100%"}),
-            Art.Text(title.desc, 13, C.paper, {width = "100%"})}, {width = "100%"}, true),
+            Art.Title(title.name, 27, C.paper, {width = "100%"}),
+            Art.Text(title.desc, 13, C.paper, {width = "100%", lineHeight = 1.65})}, {width = "100%", padding = 18}, true),
+        UI.Panel {width = "100%", flexDirection = "row", flexWrap = "wrap", gap = 10, children = {
+            Metric("完成酒局", s.banquetCount .. " 场"), Metric("总花费", "¥" .. s.totalSpent),
+        }},
         Art.StatRow("起始职级", "Lv." .. s.startLevel .. " " .. GameLogic.GetLevelData(s.startLevel).name),
-        Art.StatRow("完成酒局", s.banquetCount .. " 场"),
-        Art.StatRow("被优化次数", s.optimizeCount .. " 次"),
-        Art.StatRow("总花费", "¥" .. s.totalSpent),
-        Art.StatRow("最高连续升职", s.maxConsecutive .. " 次"), record,
-        Art.Button("重新入职  →", function() resultCache = {}; GameLogic.Reset(); Navigate("menu") end),
+        Art.StatRow("被优化次数", s.optimizeCount .. " 次", s.optimizeCount > 0 and C.red or C.muted),
+        Art.StatRow("最高连续升职", s.maxConsecutive .. " 次"),
+    }, {minWidth = 0, padding = 20, gap = 16})
+    return Sheet(headline, description, {
+        TwoColumns(summary, record),
+        Art.Button("合上手记，重新入职  →", function() resultCache = {}; GameLogic.Reset(); Navigate("menu") end,
+            false, {width = "100%", minHeight = 52}),
     })
 end
 
 -- 图鉴是纯 UI 支路；不重置 State、不掺入开局选择、不展示隐藏对手。
 function Screens.CreateArtGallery()
-    local entries = {}
+    local characters, restaurants = {}, {}
     for _, item in ipairs(GameData.Characters) do
         if item.id ~= "pu_rui_si" then
-            entries[#entries + 1] = Art.Paper({
-                Art.Picture(Art.Character(item), {width = "100%", height = 220}),
-                Art.Text(item.name, 18, C.ink, {fontWeight = "bold"}),
-                Art.Text(item.skillDesc or item.desc, 12, C.muted, {width = "100%"}),
-            }, {padding = 12, minWidth = 0})
+            characters[#characters + 1] = Art.Paper({
+                Art.Picture(Art.Character(item), {width = "100%", height = 210}),
+                Art.Title(item.name, 20, C.ink, {width = "100%"}),
+                Art.Text(item.skillDesc or item.desc, 12, C.muted, {width = "100%", lineHeight = 1.55}),
+            }, {padding = 16, gap = 10, minWidth = 0})
         end
     end
     for _, item in ipairs(GameData.Restaurants) do
-        entries[#entries + 1] = Art.Paper({Art.Picture(Art.Background(item), {width = "100%", height = 132, backgroundFit = "cover"}),
-            Art.Text(item.name, 16), Art.Text("TIER " .. item.tier, 11, C.purple)}, {padding = 10, minWidth = 0})
+        restaurants[#restaurants + 1] = Art.Paper({
+            Art.Picture(Art.Background(item), {width = "100%", height = 146, backgroundFit = "cover", borderRadius = 10}),
+            Art.Title(item.name, 18, C.ink, {width = "100%"}),
+            Art.Text("T" .. item.tier .. " · " .. (item.desc or ""), 12, C.muted, {width = "100%"}),
+        }, {padding = 14, gap = 10, minWidth = 0})
     end
-    local grid = UI.SimpleGrid {width = "100%", minColumnWidth = 210, gap = 14, children = entries}
-    return Art.Root({Art.Safe({Heading("ART BOOK / 美术图鉴", "桌边人物与风景", "这里只翻阅美术，不改变游戏进度。"),
-        UI.ScrollView {width = "100%", flexGrow = 1, flexBasis = 0, children = {
-            UI.Panel {width = "100%", padding = 18, children = {grid}}}},
-        Art.Button("返回主菜单", function() Navigate("menu") end, true, {margin = 12}),
-    })})
+    return Sheet("桌边人物与风景", "这里只翻阅美术，不改变游戏进度。", {
+        Art.Button("← 返回主菜单", function() Navigate("menu") end, true, {alignSelf = "flex-start"}),
+        Art.Title("人物篇", 21, C.ink),
+        UI.SimpleGrid {width = "100%", minColumnWidth = 240, gap = 16, children = characters},
+        Art.Title("场地篇", 21, C.ink, {marginTop = 10}),
+        UI.SimpleGrid {width = "100%", minColumnWidth = 270, gap = 16, children = restaurants},
+    })
 end
 
 function Screens.Shutdown()

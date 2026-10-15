@@ -706,6 +706,15 @@ end
 --- 开始一回合的大话骰
 function GameLogic.StartLiarRound()
     local s = GameLogic.State
+    local L = s.liar
+    -- 标记随 liar 表一起重置；同一事件重建界面时保留骰子、行动进度和结算结果。
+    if L.banquetToken == s.banquetId and L.roundToken == s.round and L.eventToken == s.currentEvent then
+        return L
+    end
+    L.banquetToken = s.banquetId
+    L.roundToken = s.round
+    L.eventToken = s.currentEvent
+    L.finished = false
     s.liar.active = true
     s.liar.playerDie = math.random(1, 6)
     s.liar.opponentDie = math.random(1, 6)
@@ -744,8 +753,12 @@ function GameLogic.LiarRaise(bid)
     local s = GameLogic.State
     local L = s.liar
     if not L.active or L.turn ~= "player" then return false, "现在不是你的回合" end
+    -- 先验证类型及有限整数范围，避免比较或 %d 格式化非法输入时崩溃。
+    if type(bid) ~= "number" or bid ~= bid or bid < 2 or bid > 12 or bid % 1 ~= 0 then
+        return false, "叫价必须是 2 到 12 之间的有限整数"
+    end
     local minBid = math.max(2, L.currentBid + 1)
-    if bid < minBid or bid > 12 then
+    if bid < minBid then
         return false, string.format("只能叫 %d 到 12 之间", minBid)
     end
     L.currentBid = bid
@@ -818,7 +831,11 @@ end
 function GameLogic.LiarFinish()
     local s = GameLogic.State
     local L = s.liar
-    local winner = L.winner or "opponent"
+    local winner = L.winner
+    if winner ~= "player" and winner ~= "opponent" then return nil, "大话骰尚未产生赢家" end
+    if L.finished then return winner end
+    -- 先标记再应用奖励/统计，重复调用或结算重入均不能再次生效。
+    L.finished = true
     if winner == "player" then
         s.favor = math.min(100, s.favor + 5)
         print("[Liar] 玩家赢得话语权，好感+5")

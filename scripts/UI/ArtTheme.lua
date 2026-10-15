@@ -3,11 +3,11 @@
 local UI = require("urhox-libs/UI")
 local Art = {}
 Art.C = {
-    paper = {246, 239, 220, 255}, white = {255, 250, 237, 255},
-    ink = {30, 28, 34, 255}, muted = {106, 96, 99, 255},
-    yellow = {248, 190, 65, 255}, purple = {108, 75, 146, 255},
-    lilac = {226, 213, 236, 255}, dark = {35, 30, 43, 246},
-    line = {64, 53, 60, 255}, red = {172, 57, 58, 255},
+    paper = {244, 239, 229, 255}, white = {255, 252, 245, 255},
+    ink = {42, 34, 47, 255}, muted = {126, 113, 115, 255},
+    yellow = {231, 180, 79, 255}, purple = {105, 76, 122, 255},
+    lilac = {235, 224, 236, 255}, dark = {38, 29, 44, 255},
+    line = {213, 199, 181, 255}, red = {165, 77, 76, 255},
     green = {69, 112, 86, 255}, blue = {71, 111, 143, 255},
     clear = {0, 0, 0, 0},
 }
@@ -70,13 +70,14 @@ Art.Assets = {
         "image/Art/UI/ui_badge_lv5.png", "image/Art/UI/ui_badge_lv6.png",
         "image/Art/UI/ui_badge_lv7.png", "image/Art/UI/ui_badge_lv8.png",
     },
-    primary = "image/Art/UI/ui_btn_primary_normal.png",
-    primaryPressed = "image/Art/UI/ui_btn_primary_pressed.png",
-    secondary = "image/Art/UI/ui_btn_secondary_normal.png",
-    secondaryPressed = "image/Art/UI/ui_btn_secondary_pressed.png",
-    card = "image/Art/UI/ui_panel_card.png",
-    dark = "image/Art/UI/ui_panel_dark.png",
-    bubble = "image/Art/UI/ui_bubble_dialog.png",
+    primary = "image/Art/UI/AfterHours/gold_button.png",
+    primaryPressed = "image/Art/UI/AfterHours/gold_button.png",
+    secondary = "image/Art/UI/AfterHours/paper_panel.png",
+    secondaryPressed = "image/Art/UI/AfterHours/paper_panel.png",
+    card = "image/Art/UI/AfterHours/paper_panel.png",
+    dark = "image/Art/UI/AfterHours/felt_panel.png",
+    bubble = "image/Art/UI/AfterHours/paper_panel.png",
+    diceCup = "image/Art/UI/AfterHours/dice_cup.png",
 }
 local A = Art.Assets
 local legacyBG = {
@@ -103,8 +104,14 @@ end
 
 function Art.Text(text, size, color, extra)
     return UI.Label(Art.Merge({text = tostring(text or ""), fontSize = size or 14,
+        fontFamily = "sans", fontWeight = "normal",
         fontColor = color or C.ink, whiteSpace = "normal", wordBreak = "break-word",
-        lineHeight = 1.35, flexShrink = 0, minWidth = 0}, extra))
+        lineHeight = 1.5, flexShrink = 0, minWidth = 0}, extra))
+end
+
+function Art.Title(text, size, color, extra)
+    return Art.Text(text, size or 26, color, Art.Merge({fontFamily = "menu", fontWeight = "bold",
+        lineHeight = 1.35}, extra))
 end
 
 function Art.Picture(path, extra)
@@ -135,35 +142,46 @@ end
 
 function Art.Paper(children, extra, dark)
     return UI.Panel(Art.Merge({backgroundImage = Art.Pick(dark and A.dark or A.card),
-        backgroundFit = "sliced", backgroundSlice = {20, 20, 20, 20},
-        backgroundColor = dark and C.dark or C.paper, borderWidth = 2, borderColor = C.ink,
-        borderRadius = 3, padding = 16, gap = 10, children = children,
-        boxShadow = {{x = 4, y = 5, blur = 0, color = {30, 28, 34, 90}}}}, extra))
+        backgroundFit = "sliced", backgroundSlice = {24, 24, 24, 24},
+        backgroundColor = C.clear, borderWidth = 0, borderRadius = 12,
+        padding = 18, gap = 12, children = children,
+        boxShadow = {{x = 0, y = 5, blur = 18, color = {42, 34, 47, 24}}}}, extra))
 end
 
--- Panel 按钮允许长选项自然换行，避免 Button 内部单行文字裁切。
+-- 长选项可换行；禁用状态在封装与业务回调两端都应检查。
 function Art.Button(text, onClick, secondary, extra)
-    local normal = secondary and A.secondary or A.primary
-    local pressed = secondary and A.secondaryPressed or A.primaryPressed
-    local label = Art.Text(text, 15, secondary and C.paper or C.ink,
-        {textAlign = "center", fontWeight = "bold", pointerEvents = "none", width = "100%"})
+    local props = extra or {}
+    local normal = not props.flat and (secondary and A.secondary or A.primary) or nil
+    local label = Art.Text(text, props.fontSize or 13, C.ink,
+        {textAlign = props.textAlign or "center", fontFamily = "sans", fontWeight = "bold",
+            pointerEvents = "none", width = "100%", lineHeight = 1.3})
     local function restore(_, widget)
-        widget:SetStyle({backgroundImage = Art.Pick(normal), translateY = 0})
+        widget:SetStyle({imageTint = {255, 255, 255, 255}, translateY = 0})
     end
-    local button = UI.Panel(Art.Merge({minHeight = 46, paddingHorizontal = 16, paddingVertical = 10,
+    return UI.Panel(Art.Merge({minHeight = 46, flexShrink = 0, paddingHorizontal = 16, paddingVertical = 11,
         backgroundImage = Art.Pick(normal), backgroundFit = "sliced",
-        backgroundSlice = {14, 20, 18, 20},
-        backgroundColor = secondary and C.purple or C.yellow, borderWidth = 2, borderColor = C.ink,
-        borderRadius = 3, justifyContent = "center", alignItems = "center", pointerEvents = "box-only",
-        transition = "translateY 0.12s easeOut", children = {label},
+        backgroundSlice = secondary and {24, 24, 24, 24} or {20, 30, 20, 30},
+        backgroundColor = props.flat and C.white or C.clear, borderWidth = props.flat and 1 or 0,
+        borderColor = C.line, borderRadius = 10,
+        justifyContent = "center", alignItems = "center", pointerEvents = "box-only",
+        transition = "translateY 0.10s easeOut", children = {label},
+        onPointerEnter = function(_, widget)
+            if not widget.props.disabled then widget:SetStyle({imageTint = {255, 248, 225, 255}}) end
+        end,
         onPointerDown = function(event, widget)
-            if event:IsPrimaryButton() then widget:SetStyle({backgroundImage = Art.Pick(pressed, normal), translateY = 2}) end
+            if event:IsPrimaryButton() and not widget.props.disabled then
+                widget:SetStyle({imageTint = {224, 213, 195, 255}, translateY = 1})
+            end
         end,
         onPointerUp = restore, onPointerCancel = restore, onPointerLeave = restore,
         onClick = function(widget)
             if not widget.props.disabled and onClick then onClick(widget) end
         end}, extra))
-    return button
+end
+
+function Art.SetDisabled(button, disabled)
+    button.props.disabled = disabled
+    button:SetStyle({opacity = disabled and 0.38 or 1})
 end
 
 function Art.Badge(level, size)
@@ -186,14 +204,22 @@ local statNames = {favor = "好感", dignity = "尊严", sober = "清醒", vibe 
 local statColors = {favor = C.yellow, dignity = C.purple, sober = C.blue, vibe = C.purple, face = C.yellow}
 function Art.Stat(key, value, compact)
     local n = tonumber(value) or 0
-    local icon = Art.Picture(A.icons[key], {width = compact and 22 or 30, height = compact and 22 or 30})
+    if compact then
+        return UI.Panel {flexGrow = 1, flexShrink = 1, flexBasis = 0, minWidth = 0, gap = 3, children = {
+            Art.Text(statNames[key] or key, 9, C.muted, {width = "100%", textAlign = "center", whiteSpace = "nowrap"}),
+            Art.Title(tostring(n), 12, C.ink, {width = "100%", textAlign = "center"}),
+            UI.ProgressBar {value = math.max(0, math.min(1, n / 100)), height = 3, width = "100%",
+                fillColor = statColors[key], backgroundColor = C.line, borderRadius = 3},
+        }}
+    end
+    local icon = Art.Picture(A.icons[key], {width = 30, height = 30})
     return UI.Panel {flexGrow = 1, flexShrink = 1, flexBasis = 0, minWidth = 0, gap = 4,
         children = {
             UI.Panel {width = "100%", flexDirection = "row", alignItems = "center", gap = 4, children = {
                 icon, Art.Text((statNames[key] or key) .. " " .. n, compact and 11 or 13, C.ink,
                     {flexGrow = 1, flexBasis = 0, flexShrink = 1, minWidth = 0})}},
-            UI.ProgressBar {value = math.max(0, math.min(1, n / 100)), height = compact and 4 or 6,
-                width = "100%", fillColor = statColors[key], backgroundColor = {200, 189, 177, 255}, borderRadius = 0},
+            UI.ProgressBar {value = math.max(0, math.min(1, n / 100)), height = compact and 3 or 5,
+                width = "100%", fillColor = statColors[key], backgroundColor = C.line, borderRadius = 3},
         }}
 end
 
@@ -204,20 +230,20 @@ function Art.Stats(state, compact)
     end
     return UI.Panel {width = "100%", flexDirection = "row", gap = compact and 6 or 12,
         padding = compact and 8 or 12, backgroundColor = C.paper,
-        borderBottomWidth = 2, borderBottomColor = C.ink, children = children}
+        borderBottomWidth = 1, borderBottomColor = C.line, children = children}
 end
 
 function Art.HUD(state, levelName)
     local children = {
-        Art.Text("DAY " .. state.currentDay .. " / " .. state.maxDays, 13, C.yellow, {minWidth = 104}),
-        UI.Panel {minWidth = 174, flexDirection = "row", gap = 6, alignItems = "center", children = {
-            Art.Badge(state.currentLevel, 28), Art.Text("Lv." .. state.currentLevel .. " " .. levelName, 13, C.paper,
-                {minWidth = 140})}},
-        Art.Text("余额 ¥" .. state.money, 13, C.yellow, {minWidth = 136}),
+        Art.Text("DAY " .. state.currentDay .. " / " .. state.maxDays, 11, C.yellow, {width = 88}),
+        UI.Panel {width = 165, flexDirection = "row", gap = 4, alignItems = "center", children = {
+            Art.Badge(state.currentLevel, 24), Art.Text("Lv." .. state.currentLevel .. " " .. levelName, 10, C.white,
+                {flexGrow = 1, flexBasis = 0, flexShrink = 1, whiteSpace = "nowrap"})}},
+        Art.Text("¥" .. state.money, 11, C.yellow, {width = 83, textAlign = "right"}),
     }
-    return UI.Panel {width = "100%", minHeight = 44, paddingHorizontal = 12, paddingVertical = 5,
+    return UI.Panel {width = "100%", minHeight = 40, paddingHorizontal = 12, paddingVertical = 5,
         flexDirection = "row", flexWrap = "wrap", alignItems = "center", justifyContent = "space-between",
-        gap = 8, backgroundColor = C.ink, borderBottomWidth = 3, borderBottomColor = C.yellow, children = children}
+        columnGap = 8, rowGap = 4, backgroundColor = C.dark, children = children}
 end
 
 function Art.Safe(children, extra)
