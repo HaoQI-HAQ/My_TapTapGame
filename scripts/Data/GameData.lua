@@ -49,48 +49,67 @@ GameData.Workplaces = {
 GameData.Characters = {
     {
         id = "intern", name = "实习生", icon = "🆕", startLevel = 1,
+        portrait = "image/Art/Characters/intern_portrait.png",
+        illustration = "image/Art/Characters/intern_normal.png",
         skill = "萌新光环", skillDesc = "每场酒局第一次失误不扣好感",
         desc = "什么都不懂但什么都想学", difficulty = 1,
     },
     {
         id = "worker", name = "打工牛马", icon = "🐴", startLevel = 2,
+        portrait = "image/Art/Characters/worker_portrait.png",
+        illustration = "image/Art/Characters/worker_normal.png",
         skill = "已读不回", skillDesc = "每场可跳过一次强制对话",
         desc = "社畜本畜，卑微但有梗", difficulty = 2,
     },
     {
         id = "designer", name = "设计师", icon = "🎨", startLevel = 3,
+        portrait = "image/Art/Characters/designer_portrait.png",
+        illustration = "image/Art/Characters/designer_normal.png",
         skill = "五彩斑斓黑", skillDesc = "对话中可解锁隐藏创意选项",
         desc = "需求听不懂但画得出来", difficulty = 3,
     },
     {
         id = "dev", name = "程序员", icon = "🔧", startLevel = 3,
+        portrait = "image/Art/Characters/dev_portrait.png",
+        illustration = "image/Art/Characters/dev_normal.png",
         skill = "Debug", skillDesc = "清醒度下降速度减半",
         desc = "高薪但社恐，喝多了可能写代码", difficulty = 3,
     },
     {
         id = "sales", name = "销售冠军", icon = "🎤", startLevel = 3,
+        portrait = "image/Art/Characters/sales_portrait.png",
+        illustration = "image/Art/Characters/sales_normal.png",
         skill = "话术王", skillDesc = "好感度增减幅度×1.5",
         desc = "能把梳子卖给和尚", difficulty = 3,
     },
     {
         id = "hr", name = "HR", icon = "📊", startLevel = 3,
+        portrait = "image/Art/Characters/hr_portrait.png",
+        illustration = "image/Art/Characters/hr_normal.png",
         skill = "背调", skillDesc = "每场可查看对方一个隐藏属性",
         desc = "笑里藏刀，信息就是武器", difficulty = 3,
     },
     {
         id = "pm", name = "产品经理", icon = "📋", startLevel = 4,
+        portrait = "image/Art/Characters/pm_portrait.png",
+        illustration = "image/Art/Characters/pm_normal.png",
         skill = "需求变更", skillDesc = "每场可推翻一次已选选项重选",
         desc = "永远在改需求", difficulty = 4,
     },
     {
         id = "veteran", name = "老油条", icon = "👴", startLevel = 5,
+        portrait = "image/Art/Characters/veteran_portrait.png",
+        illustration = "image/Art/Characters/veteran_normal.png",
         skill = "太极推手", skillDesc = "每场可将一个负面效果转嫁",
         desc = "在公司活了二十年的终极形态", difficulty = 5,
     },
     {
         id = "boss", name = "区域老板", icon = "👔", startLevel = 7,
+        portrait = "image/Art/Characters/boss_portrait.png",
+        illustration = "image/Art/Characters/boss_normal.png",
         skill = "我请客", skillDesc = "可强制买单提升全场面子值+20",
-        desc = "🔥 Hard Mode：仅2天，对手含隐藏Boss", difficulty = 6,
+        desc = "🔥 Hard Mode：仅2天，决胜局面对普老板·普瑞斯",
+        difficulty = 6,
         isRegionalBoss = true,
     },
 }
@@ -100,35 +119,35 @@ GameData.Characters = {
 -- ============================================================================
 GameData.Restaurants = {
     -- Tier 1：接地气
-    { id = "bbq",       name = "路边烧烤摊", tier = 1, icon = "🏮", costPerPerson = 80,  faceBonus = 2,  desc = "塑料凳子配扎啤" },
-    { id = "flyshop",   name = "苍蝇小馆",   tier = 1, icon = "🍜", costPerPerson = 60,  faceBonus = 1,  desc = "菜好吃但环境简陋" },
-    { id = "hotpot",    name = "街边火锅",   tier = 1, icon = "🫕", costPerPerson = 120, faceBonus = 5,  desc = "火锅面前人人平等" },
-    { id = "dapaidang", name = "大排档",     tier = 1, icon = "🍲", costPerPerson = 100, faceBonus = 3,  desc = "热闹、嘈杂、适合吹牛" },
+    { id = "bbq",       name = "路边烧烤摊", tier = 1, icon = "🏮", costPerPerson = 80,  faceBonus = 2,  background = "image/Art/Backgrounds/bg_bbq.png", desc = "塑料凳子配扎啤" },
+    { id = "flyshop",   name = "苍蝇小馆",   tier = 1, icon = "🍜", costPerPerson = 60,  faceBonus = 1,  background = "image/Art/Backgrounds/bg_flyshop.png", desc = "菜好吃但环境简陋" },
+    { id = "hotpot",    name = "街边火锅",   tier = 1, icon = "🫕", costPerPerson = 120, faceBonus = 5,  background = "image/Art/Backgrounds/bg_hotpot.png", desc = "火锅面前人人平等" },
+    { id = "dapaidang", name = "大排档",     tier = 1, icon = "🍲", costPerPerson = 100, faceBonus = 3,  background = "image/Art/Backgrounds/bg_dapaidang.png", desc = "热闹、嘈杂、适合吹牛" },
     -- Tier 2：体面
-    { id = "biz_chinese", name = "商务中餐厅", tier = 2, icon = "🍱", costPerPerson = 400,  faceBonus = 12, desc = "包间、转盘、标配商务宴" },
-    { id = "izakaya",     name = "日料居酒屋", tier = 2, icon = "🍣", costPerPerson = 350,  faceBonus = 10, desc = "清酒配刺身，文艺范儿" },
-    { id = "steak",       name = "西餐牛排馆", tier = 2, icon = "🥩", costPerPerson = 500,  faceBonus = 14, desc = "刀叉礼仪也是考验" },
-    { id = "craftbeer",   name = "精酿酒吧",   tier = 2, icon = "🍺", costPerPerson = 250,  faceBonus = 8,  desc = "年轻人的主场" },
+    { id = "biz_chinese", name = "商务中餐厅", tier = 2, icon = "🍱", costPerPerson = 400, faceBonus = 12, background = "image/Art/Backgrounds/bg_biz_chinese.png", desc = "包间、转盘、标配商务宴" },
+    { id = "izakaya",     name = "日料居酒屋", tier = 2, icon = "🍣", costPerPerson = 350, faceBonus = 10, background = "image/Art/Backgrounds/bg_izakaya.png", desc = "清酒配刺身，文艺范儿" },
+    { id = "steak",       name = "西餐牛排馆", tier = 2, icon = "🥩", costPerPerson = 500, faceBonus = 14, background = "image/Art/Backgrounds/bg_steak.png", desc = "刀叉礼仪也是考验" },
+    { id = "craftbeer",   name = "精酿酒吧",   tier = 2, icon = "🍺", costPerPerson = 250, faceBonus = 8,  background = "image/Art/Backgrounds/bg_craftbeer.png", desc = "年轻人的主场" },
     -- Tier 3：高端
-    { id = "private",  name = "私房菜会所",    tier = 3, icon = "🏯", costPerPerson = 1500, faceBonus = 25, desc = "低调有排面，懂的都懂" },
-    { id = "michelin", name = "米其林餐厅",    tier = 3, icon = "🦞", costPerPerson = 2000, faceBonus = 30, desc = "分子料理配红酒" },
-    { id = "omakase",  name = "高端日料Omakase", tier = 3, icon = "🐟", costPerPerson = 1800, faceBonus = 28, desc = "主厨决定吃什么" },
+    { id = "private",  name = "私房菜会所",      tier = 3, icon = "🏯", costPerPerson = 1500, faceBonus = 25, background = "image/Art/Backgrounds/bg_private.png", desc = "低调有排面，懂的都懂" },
+    { id = "michelin", name = "米其林餐厅",      tier = 3, icon = "🦞", costPerPerson = 2000, faceBonus = 30, background = "image/Art/Backgrounds/bg_michelin.png", desc = "分子料理配红酒" },
+    { id = "omakase",  name = "高端日料Omakase", tier = 3, icon = "🐟", costPerPerson = 1800, faceBonus = 28, background = "image/Art/Backgrounds/bg_omakase.png", desc = "主厨决定吃什么" },
     -- Tier 4：离谱
-    { id = "fivestar", name = "五星酒店中餐", tier = 4, icon = "🏰", costPerPerson = 3000, faceBonus = 40, desc = "顶级排面" },
-    { id = "yacht",    name = "游艇晚宴",     tier = 4, icon = "🛥️", costPerPerson = 5000, faceBonus = 50, desc = "海上没信号" },
+    { id = "fivestar", name = "五星酒店中餐", tier = 4, icon = "🏰", costPerPerson = 3000, faceBonus = 40, background = "image/Art/Backgrounds/bg_fivestar.png", desc = "顶级排面" },
+    { id = "yacht",    name = "游艇晚宴",     tier = 4, icon = "🛥️", costPerPerson = 5000, faceBonus = 50, background = "image/Art/Backgrounds/bg_yacht.png", desc = "海上没信号" },
 }
 
 -- ============================================================================
--- 酒水类型
+-- 酒水类型（图标仅表示种类，不是任何品牌的瓶身或商标）
 -- ============================================================================
 GameData.DrinkTypes = {
-    { id = "beer",     name = "啤酒",     icon = "🍺", faceBase = 1, soberHit = 10 },
-    { id = "wine",     name = "红酒",     icon = "🍷", faceBase = 3, soberHit = 15 },
-    { id = "baijiu",   name = "白酒",     icon = "🥃", faceBase = 4, soberHit = 25 },
-    { id = "cocktail", name = "鸡尾酒",   icon = "🍸", faceBase = 2, soberHit = 12 },
-    { id = "foreign",  name = "洋酒",     icon = "🥂", faceBase = 5, soberHit = 20 },
-    { id = "sake",     name = "清酒/梅酒", icon = "🍶", faceBase = 2, soberHit = 8 },
-    { id = "tea",      name = "以茶代酒", icon = "🫖", faceBase = 0, soberHit = 0 },
+    { id = "beer",     name = "啤酒",     icon = "🍺", faceBase = 1, soberHit = 10, thumbnail = "image/Art/Drinks/icon_drink_beer.png" },
+    { id = "wine",     name = "红酒",     icon = "🍷", faceBase = 3, soberHit = 15, thumbnail = "image/Art/Drinks/icon_drink_wine.png" },
+    { id = "baijiu",   name = "白酒",     icon = "🥃", faceBase = 4, soberHit = 25, thumbnail = "image/Art/Drinks/icon_drink_baijiu.png" },
+    { id = "cocktail", name = "鸡尾酒",   icon = "🍸", faceBase = 2, soberHit = 12, thumbnail = "image/Art/Drinks/icon_drink_cocktail.png" },
+    { id = "foreign",  name = "洋酒",     icon = "🥂", faceBase = 5, soberHit = 20, thumbnail = "image/Art/Drinks/icon_drink_foreign.png" },
+    { id = "sake",     name = "清酒/梅酒", icon = "🍶", faceBase = 2, soberHit = 8,  thumbnail = "image/Art/Drinks/icon_drink_sake.png" },
+    { id = "tea",      name = "以茶代酒", icon = "🫖", faceBase = 0, soberHit = 0,  thumbnail = "image/Art/Drinks/icon_drink_tea.png" },
 }
 
 -- ============================================================================
@@ -179,6 +198,61 @@ GameData.DrinkBrands = {
         { name = "大红袍",  price = 200, face = 8, special = "茶也能有排面" },
         { name = "普洱",    price = 80,  face = 4, special = "稳重" },
     },
+}
+
+-- 品牌只复用酒类图标；显示时必须保留 thumbnailLabel，不能冒充品牌立绘。
+for _, drinkType in ipairs(GameData.DrinkTypes) do
+    for _, brand in ipairs(GameData.DrinkBrands[drinkType.id] or {}) do
+        brand.thumbnail = drinkType.thumbnail
+        brand.thumbnailKind = "drink_type"
+        brand.thumbnailLabel = drinkType.name .. "类型示意（非品牌立绘）"
+        brand.desc = brand.special .. " · " .. brand.thumbnailLabel
+    end
+end
+
+-- ============================================================================
+-- 推荐菜：需求表21项 + 本轮明确补足的解酒水果 fruit（第22项）
+-- 未量化的“解酒”在本轮设清醒+5；fruit ¥80/清醒+10，所有Tier均可选。
+-- ============================================================================
+GameData.Dishes = {
+    { id = "kebab", name = "烤串拼盘", tier = 1, price = 80, face = 0, vibe = 5, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_kebab.png" },
+    { id = "crayfish", name = "小龙虾", tier = 1, price = 120, face = 0, vibe = 8, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_crayfish.png" },
+    { id = "peanuts", name = "花生毛豆", tier = 1, price = 20, face = 0, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_peanuts.png" },
+    { id = "lamb", name = "烤全羊", tier = 1, price = 580, face = 15, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_lamb.png" },
+    { id = "beerduck", name = "啤酒鸭", tier = 1, price = 68, face = 0, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_beerduck.png" },
+    { id = "hotpot", name = "牛油火锅", tier = 1, price = 200, face = 0, vibe = 10, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_hotpot.png" },
+    { id = "cucumber", name = "拍黄瓜", tier = 1, price = 18, face = 0, vibe = 0, sober = 5, thumbnail = "image/Art/Dishes/icon_dish_cucumber.png" },
+    { id = "kungpao", name = "宫保鸡丁", tier = 2, price = 68, face = 0, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_kungpao.png" },
+    { id = "squirrelfish", name = "松鼠桂鱼", tier = 2, price = 288, face = 10, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_squirrelfish.png" },
+    { id = "sashimi", name = "刺身拼盘", tier = 2, price = 380, face = 12, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_sashimi.png" },
+    { id = "wagyu", name = "和牛烧肉", tier = 2, price = 480, face = 15, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_wagyu.png" },
+    { id = "tomahawk", name = "战斧牛排", tier = 2, price = 588, face = 18, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_tomahawk.png" },
+    { id = "beerplatter", name = "精酿拼盘", tier = 2, price = 158, face = 0, vibe = 12, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_beerplatter.png" },
+    { id = "buddhajump", name = "佛跳墙", tier = 3, price = 888, face = 20, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_buddhajump.png" },
+    { id = "lobster", name = "龙虾刺身", tier = 3, price = 1280, face = 25, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_lobster.png" },
+    { id = "matsutake", name = "松茸炖鸡", tier = 3, price = 680, face = 18, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_matsutake.png" },
+    { id = "cabbage", name = "开水白菜", tier = 3, price = 388, face = 30, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_cabbage.png" },
+    { id = "omakase", name = "Omakase寿司", tier = 3, price = 1500, face = 28, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_omakase.png" },
+    { id = "abalone", name = "鲍鱼捞饭", tier = 4, price = 1680, face = 35, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_abalone.png" },
+    { id = "caviar", name = "鱼子酱", tier = 4, price = 2800, face = 40, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_caviar.png" },
+    { id = "truffle", name = "白松露意面", tier = 4, price = 1980, face = 38, vibe = 0, sober = 0, thumbnail = "image/Art/Dishes/icon_dish_truffle.png" },
+    { id = "fruit", name = "解酒水果", tier = 1, price = 80, face = 0, vibe = 0, sober = 10, allTiers = true, addedThisRound = true, desc = "本轮补足的第22道菜，清醒+10（最高100）", thumbnail = "image/Art/Dishes/icon_dish_fruit.png" },
+}
+
+-- 普通对手由所选餐厅Tier决定：T1同事、T2领导、T3-4客户。
+GameData.Opponents = {
+    { id = "colleague", name = "同事", minTier = 1, maxTier = 1, portrait = "image/Art/NPC/colleague_normal.png" },
+    { id = "leader", name = "直属领导", minTier = 2, maxTier = 2, portrait = "image/Art/NPC/leader_normal.png" },
+    { id = "client", name = "客户", minTier = 3, maxTier = 4, portrait = "image/Art/NPC/client_normal.png" },
+}
+
+-- 综合评分权重不变；低职级考核不要求买昂贵排面，按Lv分段公开门槛。
+-- Lv1-2需45分，Lv3-4需48，Lv5-6需52，Lv7-8需55；+2仍需极佳属性。
+GameData.PromotionRules = {
+    exceptionalLevels = 2,
+    scoreThresholds = { 45, 45, 48, 48, 52, 52, 55, 55 },
+    minFavor = 70, minSober = 60, minDignity = 30, minPro = 5,
+    description = "普通角色：达本职级晋升分数（Lv1-2:45/Lv3-4:48/Lv5-6:52/Lv7-8:55）、好感>=70、清醒>=60、尊严>=30、专业>=5，跨级晋升+2（最高Lv.8）；区域老板仍+1",
 }
 
 -- ============================================================================
@@ -357,11 +431,69 @@ GameData.DialogEvents = {
 }
 
 -- ============================================================================
--- 隐藏Boss（区域老板第2天对手）
+-- 最终Boss（沿用 HiddenBosses API；不加入9个可玩角色，也不是HR）
 -- ============================================================================
 GameData.HiddenBosses = {
-    { id = "shareholder", name = "大股东",    icon = "🦈", desc = "掌握生杀大权，一句话决定命运" },
-    { id = "ceo",         name = "创始人/CEO", icon = "👑", desc = "传奇人物，格局极大" },
+    {
+        id = "pu_rui_si", name = "普老板·普瑞斯", displayName = "普老板", icon = "👔",
+        background = "image/Art/Backgrounds/bg_yacht.png", -- 兼容字段；当前场景仍使用所选餐厅背景
+        portrait = "image/Art/NPC/pu_rui_si_normal.png",
+        illustration = "image/Art/Characters/pu_rui_si_body.png",
+        finalPortrait = "image/Art/NPC/pu_rui_si_final.png",
+        portraits = {
+            normal = "image/Art/NPC/pu_rui_si_normal.png",
+            smile = "image/Art/Characters/pu_rui_si_smile.png",
+            skeptical = "image/Art/Characters/pu_rui_si_skeptical.png",
+            drunk = "image/Art/Characters/pu_rui_si_drunk.png",
+            final = "image/Art/NPC/pu_rui_si_final.png",
+        },
+        isBoss = true,
+        desc = "普瑞斯，称普老板；区域老板Day2必遇，普通角色最终日确定遇见",
+    },
+}
+
+-- 普老板专属考核，按回合顺序轮换，不参与普通随机事件池。
+GameData.BossEvents = {
+    {
+        id = "pu_strategy", type = "boss", trigger = "pu_rui_si",
+        text = "普老板·普瑞斯没有碰酒杯：\"我看的是结果。给你一个季度，你怎么让这个项目活下来？\"",
+        choices = {
+            { text = "先核实现金流，给出里程碑和止损线", effects = { pro = 8, favor = 8, dignity = 3 } },
+            { text = "您一句话，我保证翻十倍！", effects = { face = 5, favor = -8, pro = -3 } },
+            { text = "今晚先喝好，业务明天说", effects = { sober = -15, favor = -10 } },
+            { text = "先砍一半人，数据自然好看", effects = { dignity = -10, favor = -5 } },
+        },
+    },
+    {
+        id = "pu_accountability", type = "boss", trigger = "pu_rui_si",
+        text = "普老板放下一份亏损报告：\"供应商、团队、客户都说不是自己的错。你来负责，第一步做什么？\"",
+        choices = {
+            { text = "先承担协调责任，公开事实和补救计划", effects = { pro = 6, favor = 7, dignity = 5 } },
+            { text = "这是前任留下的锅", effects = { favor = -8, dignity = -5 } },
+            { text = "替团队罚三杯，别再问了", effects = { sober = -35, vibe = 8, favor = -5 } },
+            { text = "少汇报，先把报表修漂亮", effects = { favor = -10, dignity = -10 } },
+        },
+    },
+    {
+        id = "pu_boundary", type = "boss", trigger = "pu_rui_si",
+        text = "普老板推开酒瓶：\"客户拿订单换一个不合规的承诺。今晚当着大家的面，你敢不敢拒绝？\"",
+        choices = {
+            { text = "守住合规底线，并给出可执行的替代方案", effects = { favor = 8, pro = 6, dignity = 8 } },
+            { text = "先答应下来，以后再想办法", effects = { face = 8, favor = -10, dignity = -8 } },
+            { text = "都听您的，我不做决定", effects = { favor = -5, pro = -3 } },
+            { text = "用喝酒把这个问题糊弄过去", effects = { sober = -20, vibe = 5, favor = -8 } },
+        },
+    },
+    {
+        id = "pu_final_decision", type = "final", trigger = "pu_rui_si",
+        text = "【终局】普老板·普瑞斯合上文件：\"酒量不是任命书。最后一次回答：坐上这个位置，你愿意对谁负责？\"",
+        choices = {
+            { text = "对团队、客户和结果负责，用承诺和事实接受考核", effects = { pro = 10, favor = 10, dignity = 5, bossApproval = true } },
+            { text = "只要您满意，其他都不重要", effects = { favor = -8, dignity = -10 } },
+            { text = "对明确的目标负责，也接受失败时的问责", effects = { pro = 8, favor = 8, dignity = 8, bossApproval = true } },
+            { text = "先喝完这杯，就算您答应了！", effects = { sober = -30, favor = -15 } },
+        },
+    },
 }
 
 -- ============================================================================

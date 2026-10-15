@@ -14,6 +14,45 @@ local DiceDemo = require("UI.DiceDemo")
 ---@type any
 local uiRoot_ = nil
 
+-- 资源就绪门：预览走网络下载，图片可能在脚本首帧尚未就绪。
+-- UI 库的图片缓存会把首次加载失败永久缓存，所以必须先等下载完成再进主菜单。
+local assetsReady_ = false
+local waitElapsed_ = 0
+local MAX_ASSET_WAIT = 12.0
+
+local function ShowLoadingScreen()
+    local root = UI.Panel {
+        width = "100%", height = "100%",
+        justifyContent = "center", alignItems = "center", gap = 12,
+        backgroundColor = { 246, 239, 220, 255 },
+        children = {
+            UI.Label { text = "酒桌文化", fontSize = 36, fontWeight = "bold",
+                fontColor = { 30, 28, 34, 255 } },
+            UI.Label { text = "正在准备饭局…", fontSize = 15, fontColor = { 106, 96, 99, 255 } },
+        },
+    }
+    UI.SetRoot(root, true)
+    uiRoot_ = root
+end
+
+local function EnterMenu()
+    if assetsReady_ then return end
+    assetsReady_ = true
+    print("[酒桌文化] 资源就绪，进入主菜单")
+    SwitchScreen("menu")
+end
+
+---@param eventType string
+---@param eventData UpdateEventData
+function HandleAssetWait(eventType, eventData)
+    if assetsReady_ then return end
+    waitElapsed_ = waitElapsed_ + eventData["TimeStep"]:GetFloat()
+    if waitElapsed_ >= MAX_ASSET_WAIT then
+        print("[酒桌文化] 资源等待超时，先进入主菜单")
+        EnterMenu()
+    end
+end
+
 -- ============================================================================
 -- 生命周期
 -- ============================================================================
@@ -29,7 +68,11 @@ function Start()
         fonts = {
             { family = "sans", weights = {
                 normal = "Fonts/MiSans-Regular.ttf",
-            } }
+            } },
+            { family = "menu", weights = {
+                normal = "Fonts/NotoSansSC-Black.ttf",
+                bold = "Fonts/NotoSansSC-Black.ttf",
+            } },
         },
         scale = UI.Scale.DEFAULT,
     })
@@ -37,13 +80,18 @@ function Start()
     -- 注册屏幕切换回调
     Screens.SetOnScreenChange(SwitchScreen)
 
-    -- 显示主菜单
-    SwitchScreen("menu")
-
-    print("[酒桌文化] v1.2.1 启动成功")
+    -- 先显示加载页，等预下载完成再进主菜单
+    ShowLoadingScreen()
+    SubscribeToEvent("Update", "HandleAssetWait")
+    cache:ObserveDownloads(
+        function(completed, total, bytes) end,
+        function(bytes) EnterMenu() end
+    )
+    print("[酒桌文化] v1.2.1 启动，等待资源就绪")
 end
 
 function Stop()
+    Screens.Shutdown()
     UI.Shutdown()
 end
 
@@ -72,6 +120,8 @@ function SwitchScreen(screenName)
         newRoot = Screens.CreateDrinkTypeSelect()
     elseif screenName == "select_drink_brand" then
         newRoot = Screens.CreateDrinkBrandSelect()
+    elseif screenName == "select_dish" then
+        newRoot = Screens.CreateDishSelect()
     elseif screenName == "playing" then
         newRoot = Screens.CreateGameScreen()
     elseif screenName == "day_result" then

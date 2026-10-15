@@ -19,6 +19,18 @@ GameLogic.State = {
     restaurant = nil,   ---@type table|nil
     drinkType = nil,    ---@type table|nil
     drinkBrand = nil,   ---@type table|nil
+    dish = nil,         ---@type table|nil
+    opponent = nil,     ---@type table|nil
+    lastChoiceFeedback = "", -- 上一回合实际变化，保留到下一回合显示
+    lastChoiceChanges = {},  ---@type table<string, number>
+    banquetId = 0,
+    banquetSerial = 0,
+    settledBanquets = {},    ---@type table<number, table>
+    bossFinalAnswered = false,
+    bossApproved = false,
+    bossCompleted = false,
+    bossDefeated = false,
+    budgetFailure = false, -- 无法负担当天完整酒局，按optimized结算，不充值
 
     -- 职级系统
     currentLevel = 1,       -- 当前职级 Lv.1~8
@@ -63,7 +75,7 @@ GameLogic.State = {
     phase = "menu",
     -- menu / select_workplace / select_character /
     -- day_start / rest_day /
-    -- select_restaurant / select_drink_type / select_drink_brand /
+    -- select_restaurant / select_drink_type / select_drink_brand / select_dish /
     -- playing / day_result /
     -- game_over
 
@@ -81,6 +93,18 @@ function GameLogic.Reset()
     s.restaurant = nil
     s.drinkType = nil
     s.drinkBrand = nil
+    s.dish = nil
+    s.opponent = nil
+    s.lastChoiceFeedback = ""
+    s.lastChoiceChanges = {}
+    s.banquetId = 0
+    s.banquetSerial = 0
+    s.settledBanquets = {}
+    s.bossFinalAnswered = false
+    s.bossApproved = false
+    s.bossCompleted = false
+    s.bossDefeated = false
+    s.budgetFailure = false
     s.currentLevel = 1
     s.startLevel = 1
     s.money = 0
@@ -182,31 +206,111 @@ end
 --- 开始新一天（由 UI 调用）
 function GameLogic.StartDay()
     local s = GameLogic.State
+    if s.phase ~= "day_start" or not s.character then return false, "当前不能开始新一天" end
 
-    -- 判定休息日
+    -- 仅在每日消费之前重置；后续餐厅/酒/菜加成不得再被清掉。
+    GameLogic.ResetBanquetStats()
+    s.restaurant = nil
+    s.drinkType = nil
+    s.drinkBrand = nil
+    s.dish = nil
+    s.opponent = nil
+
     if GameLogic.DetermineRestDay() then
+        s.banquetId = 0
         s.phase = "rest_day"
     else
-        -- 正常酒局日，进入选饭局
+        s.banquetSerial = s.banquetSerial + 1
+        s.banquetId = s.banquetSerial
         s.phase = "select_restaurant"
     end
+    print(string.format("[Day] day=%d phase=%s banquet=%d", s.currentDay, s.phase, s.banquetId))
+    return true
 end
 
 --- 休息日结束 → 进入下一天
 function GameLogic.EndRestDay()
     local s = GameLogic.State
+    if s.phase ~= "rest_day" then return false, "当前不是休息日" end
     table.insert(s.dayHistory, {
         day = s.currentDay,
         result = "rest",
         levelBefore = s.currentLevel,
         levelAfter = s.currentLevel,
     })
-    GameLogic.AdvanceDay()
+    return GameLogic.AdvanceDay()
 end
 
 -- ============================================================================
 -- 选择阶段（每日酒局）
 -- ============================================================================
+
+-- 使用目录数据作为权威来源；列表副本的 cost/affordable 不会改变价格或效果。
+---@param items table[]
+---@param selected table|string|nil
+---@return table|nil
+local function FindItem(items, selected)
+    if not selected then return nil end
+    local id = type(selected) == "table" and selected.id or selected
+    local name = type(selected) == "table" and selected.name or selected
+    for _, item in ipairs(items) do
+        if (id and item.id == id) or (name and item.name == name) then return item end
+    end
+    return nil
+end
+
+-- 为后续必选项预留最低预算，避免选完场地/酒后卡在无可负担菜品的软锁。
+---@param tier number
+local function MinimumDishCost(tier)
+    local cost = math.huge
+    for _, dish in ipairs(GameData.Dishes) do
+        if dish.tier == tier or dish.allTiers then cost = math.min(cost, dish.price) end
+    end
+    return cost
+end
+
+---@param typeId string|nil
+local function MinimumBrandCost(typeId)
+    local cost = math.huge
+    for id, brands in pairs(GameData.DrinkBrands) do
+        if not typeId or id == typeId then
+            for _, brand in ipairs(brands) do cost = math.min(cost, brand.price) end
+        end
+    end
+    return cost
+end
+
+---@param item table
+---@param cost number
+---@param reserve number|nil
+---@return table
+local function SelectionItem(item, cost, reserve)
+    local copy = {}
+    for key, value in pairs(item) do copy[key] = value end
+    copy.cost = cost
+    copy.reserve = reserve or 0
+    copy.requiredBudget = cost + copy.reserve
+    copy.affordable = GameLogic.State.money >= copy.requiredBudget
+    return copy
+end
+
+---@param cost number
+---@param reserve number|nil
+---@return boolean, string|nil
+local function Pay(cost, reserve)
+    local s = GameLogic.State
+    local required = cost + (reserve or 0)
+    if s.money < required then
+        local err = string.format("预算不足：需 ¥%d，余额 ¥%d", required, s.money)
+        if reserve and reserve > 0 then err = err .. string.format("（含后续酒菜最低预算 ¥%d）", reserve) end
+        print("[Budget] " .. err)
+        return false, err
+    end
+    s.money = s.money - cost
+    s.totalSpent = s.totalSpent + cost
+    print(string.format("[Budget] banquet=%d cost=%d balance=%d", s.banquetId, cost, s.money))
+    return true
+end
 
 --- 获取当前职级可选的餐厅
 function GameLogic.GetAvailableRestaurants()
@@ -215,66 +319,183 @@ function GameLogic.GetAvailableRestaurants()
     local results = {}
     for _, r in ipairs(GameData.Restaurants) do
         if r.tier >= minTier and r.tier <= maxTier then
-            table.insert(results, r)
+            table.insert(results, SelectionItem(r, r.costPerPerson * 2, MinimumBrandCost(nil) + MinimumDishCost(r.tier)))
         end
     end
     return results
 end
 
+--- 普通对手依据餐厅而非职级；最终日用确定规则，不额外抽隐藏概率。
+function GameLogic.SelectOpponent()
+    local s = GameLogic.State
+    if not s.restaurant then return nil end
+    local opponent = GameData.HiddenBosses[1]
+    if s.currentDay ~= s.maxDays then
+        for _, npc in ipairs(GameData.Opponents) do
+            if s.restaurant.tier >= npc.minTier and s.restaurant.tier <= npc.maxTier then
+                opponent = npc
+                break
+            end
+        end
+    end
+    -- 使用副本：最终回合切立绘不能污染静态数据或下一场。
+    s.opponent = SelectionItem(opponent, 0)
+    s.opponent.illustration = opponent.illustration or opponent.portrait
+    print(string.format("[Opponent] day=%d tier=%d id=%s", s.currentDay, s.restaurant.tier, opponent.id))
+    return s.opponent
+end
+
 function GameLogic.SelectRestaurant(restaurant)
     local s = GameLogic.State
-    s.restaurant = restaurant
-    local cost = restaurant.costPerPerson * 2
-    s.money = s.money - cost
-    s.totalSpent = s.totalSpent + cost
-    s.face = s.face + restaurant.faceBonus
+    if s.phase ~= "select_restaurant" then return false, "当前不是选餐厅阶段" end
+    local item = FindItem(GameLogic.GetAvailableRestaurants(), restaurant)
+    if not item then return false, "餐厅尚未解锁" end
+    local ok, err = Pay(item.costPerPerson * 2, item.reserve)
+    if not ok then return false, err end
+    s.restaurant = item
+    s.face = s.face + item.faceBonus
+    GameLogic.SelectOpponent()
     s.phase = "select_drink_type"
+    return true
 end
 
 function GameLogic.SelectDrinkType(drinkType)
     local s = GameLogic.State
-    s.drinkType = drinkType
+    if s.phase ~= "select_drink_type" then return false, "当前不是选酒类阶段" end
+    local item = FindItem(GameData.DrinkTypes, drinkType)
+    if not item then return false, "未知酒类" end
+    if not s.restaurant then return false, "请先选择餐厅" end
+    local required = MinimumBrandCost(item.id) + MinimumDishCost(s.restaurant.tier)
+    if s.money < required then return false, "预算不足：这个酒类无法同时负担酒品牌和推荐菜，请换一种酒" end
+    s.drinkType = item
     s.phase = "select_drink_brand"
+    return true
 end
 
 function GameLogic.GetAvailableBrands()
     local s = GameLogic.State
-    local typeId = s.drinkType.id
-    return GameData.DrinkBrands[typeId] or {}
+    if not s.drinkType then return {} end
+    local results = {}
+    for _, brand in ipairs(GameData.DrinkBrands[s.drinkType.id] or {}) do
+        local reserve = s.restaurant and MinimumDishCost(s.restaurant.tier) or 0
+        table.insert(results, SelectionItem(brand, brand.price, reserve))
+    end
+    return results
 end
 
 function GameLogic.SelectDrinkBrand(brand)
     local s = GameLogic.State
-    s.drinkBrand = brand
-    s.money = s.money - brand.price
-    s.totalSpent = s.totalSpent + brand.price
-    s.face = s.face + brand.face
+    if s.phase ~= "select_drink_brand" then return false, "当前不是选酒品牌阶段" end
+    local item = FindItem(GameLogic.GetAvailableBrands(), brand)
+    if not item then return false, "品牌不属于所选酒类" end
+    local ok, err = Pay(item.price, item.reserve)
+    if not ok then return false, err end
+    s.drinkBrand = item
+    s.face = s.face + item.face
 
-    -- 特殊效果：茅台在国企加好感
-    if brand.name == "飞天茅台" and s.workplace.id == "state" then
+    if item.name == "飞天茅台" and s.workplace and s.workplace.id == "state" then
         s.favor = math.min(100, s.favor + 10)
+        print("[Bonus] 飞天茅台 + 国企：好感+10（保留至酒局）")
     end
-
-    -- 重置每场属性
-    GameLogic.ResetBanquetStats()
-    s.phase = "playing"
+    s.phase = "select_dish"
+    return true
 end
 
---- 重置每场酒局的回合状态
+--- 同餐厅Tier推荐菜 + 所有Tier均可选的解酒水果。
+function GameLogic.GetAvailableDishes()
+    local s = GameLogic.State
+    if not s.restaurant then return {} end
+    local results = {}
+    for _, dish in ipairs(GameData.Dishes) do
+        if dish.tier == s.restaurant.tier or dish.allTiers then
+            table.insert(results, SelectionItem(dish, dish.price))
+        end
+    end
+    return results
+end
+
+function GameLogic.SelectDish(dish)
+    local s = GameLogic.State
+    if s.phase ~= "select_dish" then return false, "当前不是选推荐菜阶段" end
+    local item = FindItem(GameLogic.GetAvailableDishes(), dish)
+    if not item then return false, "这道菜不在当前菜单" end
+    local ok, err = Pay(item.price)
+    if not ok then return false, err end
+    s.dish = item
+    s.face = s.face + item.face
+    s.vibe = math.max(0, math.min(100, s.vibe + item.vibe))
+    s.sober = math.max(0, math.min(100, s.sober + item.sober))
+    s.phase = "playing"
+    print(string.format("[Banquet] id=%d dish=%s face=%d favor=%d", s.banquetId, item.id, s.face, s.favor))
+    return true
+end
+
+--- UI可据此显示“余额不足，结束当天”按钮；未付款也作为一次预算失误结算。
+function GameLogic.GetBudgetStatus()
+    local s = GameLogic.State
+    local minimum = math.huge
+    if s.phase == "select_restaurant" then
+        for _, restaurant in ipairs(GameLogic.GetAvailableRestaurants()) do
+            minimum = math.min(minimum, restaurant.requiredBudget)
+        end
+    elseif s.phase == "select_drink_type" and s.restaurant then
+        minimum = MinimumBrandCost(nil) + MinimumDishCost(s.restaurant.tier)
+    elseif s.phase == "select_drink_brand" then
+        for _, brand in ipairs(GameLogic.GetAvailableBrands()) do minimum = math.min(minimum, brand.requiredBudget) end
+    elseif s.phase == "select_dish" then
+        for _, dish in ipairs(GameLogic.GetAvailableDishes()) do minimum = math.min(minimum, dish.requiredBudget) end
+    else
+        return { canContinue = true, canEndDay = false, minimumRequired = 0, shortfall = 0, message = "" }
+    end
+    local canContinue = s.money >= minimum
+    return {
+        canContinue = canContinue, canEndDay = not canContinue,
+        minimumRequired = minimum, shortfall = math.max(0, minimum - s.money),
+        message = canContinue and "" or string.format("余额 ¥%d，最低酒局剩余预算 ¥%d；可结束当天，按被优化结算，不再扣钱", s.money, minimum),
+    }
+end
+
+function GameLogic.EndDayForInsufficientBudget()
+    local s = GameLogic.State
+    local status = GameLogic.GetBudgetStatus()
+    if not status.canEndDay then return false, "尚有可负担选项，不能以预算不足结束当天" end
+    s.budgetFailure = true
+    s.currentEvent = nil
+    s.lastChoiceFeedback = status.message
+    s.phase = "day_result"
+    print(string.format("[BudgetFailure] day=%d banquet=%d balance=%d minimum=%d -> optimized", s.currentDay, s.banquetId, s.money, status.minimumRequired))
+    return true
+end
+
+--- 重置每场酒局的回合状态（只允许每日开始前调用，拒绝消费后毁掉加成）
 function GameLogic.ResetBanquetStats()
     local s = GameLogic.State
+    if s.phase ~= "day_start" and s.phase ~= "menu" then
+        return false, "酒局消费后不能重置属性"
+    end
     s.favor = 50
     s.dignity = 50
     s.sober = 100
     s.vibe = 50
+    s.face = 0
     s.pro = 0
     s.round = 0
     s.maxRounds = math.random(6, 10)
+    s.playerDice = 0
+    s.opponentDice = 0
     s.eventHistory = {}
     s.usedSkillToday = false
     s.drinkCount = 0
     s.firstMistakeUsed = false
     s.currentEvent = nil
+    s.lastChoiceFeedback = ""
+    s.lastChoiceChanges = {}
+    s.bossFinalAnswered = false
+    s.bossApproved = false
+    s.bossCompleted = false
+    s.bossDefeated = false
+    s.budgetFailure = false
+    return true
 end
 
 -- ============================================================================
@@ -282,6 +503,7 @@ end
 -- ============================================================================
 function GameLogic.RollDice()
     local s = GameLogic.State
+    if s.phase ~= "playing" or s.currentEvent then return s.playerDice, s.opponentDice end
     s.playerDice = math.random(1, 6)
     s.opponentDice = math.random(1, 6)
 
@@ -309,7 +531,31 @@ end
 -- ============================================================================
 function GameLogic.GetNextEvent()
     local s = GameLogic.State
+    if s.phase ~= "playing" then return nil end
+    -- 重建屏幕不能偷偷推进回合；必须先回答当前事件。
+    if s.currentEvent then return s.currentEvent end
+    if s.round >= s.maxRounds or s.sober <= 0 then
+        s.phase = "day_result"
+        return nil
+    end
     s.round = s.round + 1
+
+    if s.opponent and s.opponent.isBoss then
+        local lastIndex = #GameData.BossEvents
+        local index = s.round >= s.maxRounds and lastIndex or ((s.round - 1) % (lastIndex - 1) + 1)
+        local event = GameData.BossEvents[index]
+        if event.type == "final" then
+            s.opponent.portrait = s.opponent.finalPortrait
+        elseif s.opponent.portraits then
+            -- 表情用于对话头像；illustration始终保持舞台全身立绘。
+            local mood = s.sober <= 30 and "drunk" or s.favor >= 70 and "smile" or s.favor < 40 and "skeptical" or "normal"
+            s.opponent.portrait = s.opponent.portraits[mood]
+        end
+        s.currentEvent = event
+        table.insert(s.eventHistory, event.id)
+        print(string.format("[BossEvent] banquet=%d round=%d id=%s", s.banquetId, s.round, event.id))
+        return event
+    end
 
     -- 最后回合触发终极事件
     if s.round >= s.maxRounds then
@@ -384,14 +630,26 @@ end
 -- ============================================================================
 -- 选择处理
 -- ============================================================================
-function GameLogic.MakeChoice(choiceIndex)
+--- 保留原 choice 返回值；UI可传事件id/回合数拒绝旧按钮的迟到回调。
+function GameLogic.MakeChoice(choiceIndex, eventId, round)
     local s = GameLogic.State
-    if not s.currentEvent then return nil end
-
-    local choice = s.currentEvent.choices[choiceIndex]
-    if not choice then return nil end
+    if s.phase ~= "playing" or not s.currentEvent then return nil, "当前没有待回答事件" end
+    local event = s.currentEvent
+    if (eventId and eventId ~= event.id) or (round and round ~= s.round) then
+        return nil, "该选项已过期"
+    end
+    local choice = event.choices[choiceIndex]
+    if not choice then return nil, "无效选项" end
 
     local effects = choice.effects or {}
+    if effects.money and effects.money < 0 and s.money < -effects.money then
+        return nil, "预算不足，无法执行该选项"
+    end
+    local before = {
+        favor = s.favor, dignity = s.dignity, sober = s.sober, vibe = s.vibe,
+        face = s.face, pro = s.pro, money = s.money,
+    }
+    local skillMessage = ""
 
     -- 应用效果
     if effects.favor then
@@ -404,6 +662,7 @@ function GameLogic.MakeChoice(choiceIndex)
         if s.character.id == "intern" and delta < 0 and not s.firstMistakeUsed then
             s.firstMistakeUsed = true
             delta = 0
+            skillMessage = "；萌新光环免除本次好感损失"
         end
         s.favor = math.max(0, math.min(100, s.favor + delta))
     end
@@ -431,9 +690,32 @@ function GameLogic.MakeChoice(choiceIndex)
         s.drinkCount = s.drinkCount + 1
     end
 
-    -- 检查本场酒局是否结束
+    if s.opponent and s.opponent.isBoss and event.type == "final" then
+        s.bossFinalAnswered = true
+        s.bossApproved = effects.bossApproval == true
+        s.bossCompleted = true
+    end
+
+    -- 用实际变化生成反馈（包含技能修正和上下限裁剪，不报原始配置值）。
+    local labels = { favor = "好感", dignity = "尊严", sober = "清醒", vibe = "氛围", face = "面子", pro = "专业", money = "资金" }
+    local changes, parts = {}, {}
+    for _, key in ipairs({ "favor", "dignity", "sober", "vibe", "face", "pro", "money" }) do
+        local delta = s[key] - before[key]
+        changes[key] = delta
+        if delta ~= 0 then table.insert(parts, labels[key] .. string.format("%+d", delta)) end
+    end
+    s.lastChoiceChanges = changes
+    s.lastChoiceFeedback = "上一回合：" .. choice.text .. "；" .. (#parts > 0 and table.concat(parts, "、") or "属性无变化") .. skillMessage
+    if s.opponent and s.opponent.isBoss and event.type == "final" then
+        s.lastChoiceFeedback = s.lastChoiceFeedback .. (s.bossApproved and "；普老板认可你的责任承诺" or "；普老板未认可这份回答")
+    end
+    print(string.format("[Choice] banquet=%d round=%d %s", s.banquetId, s.round, s.lastChoiceFeedback))
+    s.currentEvent = nil -- 本事件只可回答一次；下一次GetNextEvent才生成新事件。
+
     if s.round >= s.maxRounds or s.sober <= 0 then
         s.phase = "day_result"
+    else
+        s.phase = "playing"
     end
 
     return choice
@@ -443,28 +725,29 @@ end
 -- 单日结算
 -- ============================================================================
 
+--- 纯数值评分，保留既有权重；可直接在独立Lua环境测试。
+function GameLogic.GetBanquetScore()
+    local s = GameLogic.State
+    return s.favor * 0.35 + s.face * 0.2 + s.pro * 0.15 + s.vibe * 0.15
+        + (s.sober / 100) * 15 - s.currentLevel * 3
+end
+
+function GameLogic.GetPromotionThreshold()
+    return GameData.PromotionRules.scoreThresholds[GameLogic.State.currentLevel] or 55
+end
+
 --- 判定本场酒局结果: "promote" / "maintain" / "demote" / "optimized"
 function GameLogic.GetBanquetResult()
     local s = GameLogic.State
-
-    -- 醉倒 → 被优化
-    if s.sober <= 0 then
-        return "optimized"
-    end
-
-    -- 综合评分
-    local score = 0
-    score = score + s.favor * 0.35
-    score = score + s.face * 0.2
-    score = score + s.pro * 0.15
-    score = score + s.vibe * 0.15
-    score = score + (s.sober / 100) * 15  -- 清醒度贡献最多15分
-
-    -- 职级越高越难升
-    local difficultyPenalty = s.currentLevel * 3
-    score = score - difficultyPenalty
-
-    if score >= 55 then
+    local settled = s.settledBanquets[s.banquetId]
+    if settled then return settled.result end
+    if s.budgetFailure or s.sober <= 0 then return "optimized" end
+    local score = GameLogic.GetBanquetScore()
+    if score >= GameLogic.GetPromotionThreshold() then
+        -- 普老板不是花钱刷面子就能通过，必须完成终局且回答获认可。
+        if s.opponent and s.opponent.isBoss and (not s.bossFinalAnswered or not s.bossApproved) then
+            return "maintain"
+        end
         return "promote"
     elseif score >= 35 then
         return "maintain"
@@ -475,13 +758,42 @@ function GameLogic.GetBanquetResult()
     end
 end
 
---- 应用单日结算结果
-function GameLogic.ApplyBanquetResult(result)
+--- 正常晋升+1；极佳表现+2，条件公开且不改变随机数或为测试强行升职。
+function GameLogic.GetPromotionSteps()
     local s = GameLogic.State
-    local levelBefore = s.currentLevel
+    if s.character and s.character.isRegionalBoss then return 1 end
+    local rule = GameData.PromotionRules
+    if GameLogic.GetBanquetScore() >= GameLogic.GetPromotionThreshold() and s.favor >= rule.minFavor
+        and s.sober >= rule.minSober and s.dignity >= rule.minDignity and s.pro >= rule.minPro then
+        return rule.exceptionalLevels
+    end
+    return 1
+end
 
+--- 每场id幂等：首次 true,record；重复 false,原record；错误 false,err。
+--- 可选banquetId用于拒绝上一场的迟到回调；旧调用 ApplyBanquetResult(result) 仍合法。
+function GameLogic.ApplyBanquetResult(result, banquetId)
+    local s = GameLogic.State
+    local id = banquetId or s.banquetId
+    local settled = s.settledBanquets[id]
+    if settled then
+        print(string.format("[Result] ignore duplicate banquet=%d", id))
+        return false, settled
+    end
+    if id ~= s.banquetId or id <= 0 or s.phase ~= "day_result" then
+        return false, "酒局尚未结束或结算已过期"
+    end
+    result = result or GameLogic.GetBanquetResult()
+    if result ~= "promote" and result ~= "maintain" and result ~= "demote" and result ~= "optimized" then
+        return false, "无效结算结果"
+    end
+    local levelBefore = s.currentLevel
+    local score = GameLogic.GetBanquetScore()
+    local promotionThreshold = GameLogic.GetPromotionThreshold()
+    local promotionSteps = 0
     if result == "promote" then
-        s.currentLevel = math.min(8, s.currentLevel + 1)
+        promotionSteps = GameLogic.GetPromotionSteps()
+        s.currentLevel = math.min(8, s.currentLevel + promotionSteps)
         s.consecutivePromote = s.consecutivePromote + 1
         s.maxConsecutive = math.max(s.maxConsecutive, s.consecutivePromote)
     elseif result == "demote" then
@@ -491,25 +803,33 @@ function GameLogic.ApplyBanquetResult(result)
         s.currentLevel = math.max(1, s.currentLevel - 1)
         s.optimizeCount = s.optimizeCount + 1
         s.consecutivePromote = 0
-    else -- maintain
+    else
         s.consecutivePromote = 0
     end
 
-    -- 更新资金到新职级
     local newLevelData = GameData.Levels[s.currentLevel]
     if newLevelData and result == "promote" then
         s.money = math.max(s.money, newLevelData.money)
     end
-
     s.banquetCount = s.banquetCount + 1
+    s.bossDefeated = s.opponent ~= nil and s.opponent.isBoss == true
+        and s.bossFinalAnswered and s.bossApproved and result == "promote" and s.sober > 0
 
-    -- 记录历史
-    table.insert(s.dayHistory, {
-        day = s.currentDay,
-        result = result,
-        levelBefore = levelBefore,
-        levelAfter = s.currentLevel,
-    })
+    local record = {
+        banquetId = id, day = s.currentDay, result = result,
+        levelBefore = levelBefore, levelAfter = s.currentLevel,
+        score = score, promotionThreshold = promotionThreshold, promotionSteps = s.currentLevel - levelBefore,
+        promotionReason = promotionSteps > 1 and GameData.PromotionRules.description or "",
+        opponentId = s.opponent and s.opponent.id or "",
+        bossCompleted = s.bossCompleted, bossDefeated = s.bossDefeated,
+        budgetFailure = s.budgetFailure,
+    }
+    s.settledBanquets[id] = record
+    table.insert(s.dayHistory, record)
+    print(string.format("[Result] banquet=%d result=%s score=%.2f Lv.%d->%d bossDefeated=%s",
+        id, result, score, levelBefore, s.currentLevel, tostring(s.bossDefeated)))
+    if promotionSteps > 1 then print("[Promotion] " .. GameData.PromotionRules.description) end
+    return true, record
 end
 
 -- ============================================================================
@@ -519,36 +839,47 @@ end
 --- 推进到下一天或触发终局
 function GameLogic.AdvanceDay()
     local s = GameLogic.State
-
-    -- 检查胜利条件：升到Lv.8
-    if s.currentLevel >= 8 then
-        s.gameOverType = "win"
-        s.phase = "game_over"
-        return
+    if s.phase ~= "day_result" and s.phase ~= "rest_day" then
+        return false, "当天尚未完成或已经推进"
     end
+    local settled = s.settledBanquets[s.banquetId]
+    if s.phase == "day_result" and not settled then return false, "请先完成酒局结算" end
 
-    -- 检查失败条件：被优化次数达上限
+    -- 失败优先，不能用之前升到Lv.8掩盖本日被优化。
     if s.optimizeCount >= s.maxOptimize then
         s.gameOverType = "fired"
         s.phase = "game_over"
-        return
+        return true
     end
 
-    -- 检查时间条件：天数用完
+    -- 区域老板Day1到Lv.8仍继续Day2；必须在Day2完成且击败普老板。
+    -- 普通角色也必须完成最终日Boss；提前到Lv.8不能跳过终局。
+    local regional = s.character and s.character.isRegionalBoss
+    local canWin = s.currentLevel >= 8 and s.currentDay == s.maxDays
+        and settled ~= nil and settled.bossDefeated == true
+    if regional then
+        canWin = canWin and s.currentDay == 2
+    end
+    if canWin then
+        s.gameOverType = "win"
+        s.phase = "game_over"
+        return true
+    end
+
     if s.currentDay >= s.maxDays then
         s.gameOverType = "timeout"
         s.phase = "game_over"
-        return
+        return true
     end
 
-    -- 正常推进
     s.currentDay = s.currentDay + 1
     s.phase = "day_start"
+    return true
 end
 
 --- 从 day_result 进入下一天
 function GameLogic.ProceedAfterResult()
-    GameLogic.AdvanceDay()
+    return GameLogic.AdvanceDay()
 end
 
 -- ============================================================================

@@ -1,1004 +1,370 @@
--- ============================================================================
--- 《酒桌文化》v1.2.1 UI 界面模块
--- 天数进度 / 职级显示 / 每日结算 / 终局结算 / 休息日
--- ============================================================================
-
+-- 《酒桌文化》新版美术页面。主题/饭局舞台独立模块；保持旧 Screens API。
 local UI = require("urhox-libs/UI")
 local GameLogic = require("Game.GameLogic")
 local GameData = require("Data.GameData")
-local Dice3D = require("UI.Dice3D")
-
+local Art = require("UI.ArtTheme")
+local Playing = require("UI.Playing")
+local MainMenu = require("UI.MainMenu")
 local Screens = {}
-
--- 颜色常量
-local C = {
-    bgWarm = { 245, 166, 35, 255 },
-    bgDark = { 25, 28, 35, 255 },
-    panelDark = { 38, 42, 55, 245 },
-    panelCard = { 48, 54, 70, 235 },
-    panelHover = { 60, 66, 85, 240 },
-    textWhite = { 255, 255, 255, 255 },
-    textGray = { 170, 175, 185, 255 },
-    textYellow = { 255, 210, 60, 255 },
-    textGold = { 255, 180, 40, 255 },
-    accent = { 255, 140, 50, 255 },
-    green = { 76, 195, 100, 255 },
-    red = { 244, 67, 54, 255 },
-    blue = { 80, 170, 255, 255 },
-    purple = { 180, 100, 255, 255 },
-    dimBg = { 0, 0, 0, 160 },
-}
-
--- 回调
+local C, A = Art.C, Art.Assets
+---@type fun(screenName: string)?
 local onScreenChange_ = nil
+local resultCache = {}
 
 function Screens.SetOnScreenChange(callback)
     onScreenChange_ = callback
 end
 
--- ============================================================================
--- 辅助函数
--- ============================================================================
-
---- 统计行
-local function StatRow(label, value, color)
-    return UI.Panel {
-        width = "100%",
-        flexDirection = "row",
-        justifyContent = "space-between",
-        children = {
-            UI.Label { text = label, fontSize = 13, fontColor = C.textGray },
-            UI.Label { text = tostring(value), fontSize = 13, fontColor = color or C.textWhite },
-        },
-    }
+-- 既有及点菜页面由入口回调路由；图鉴只作为纯 UI 支路独立挂载。
+local function Navigate(phase)
+    print("[ArtUI] → " .. tostring(phase))
+    if onScreenChange_ then onScreenChange_(phase) end
 end
 
---- 属性进度条
-local function AttrBar(name, value, color)
-    return UI.Panel {
-        width = "100%", gap = 3,
-        children = {
-            UI.Panel {
-                width = "100%", flexDirection = "row", justifyContent = "space-between",
-                children = {
-                    UI.Label { text = name, fontSize = 11, fontColor = C.textGray },
-                    UI.Label { text = tostring(value), fontSize = 11, fontColor = C.textWhite },
-                },
-            },
-            UI.ProgressBar {
-                value = math.max(0, math.min(1, value / 100)),
-                width = "100%",
-                height = 5,
-                fillColor = color,
-                backgroundColor = { 60, 60, 60, 255 },
-                borderRadius = 3,
-            },
-        },
-    }
+local function Select(action, item, fallback)
+    local ok, err = action(item)
+    if ok == false then
+        UI.Toast.Show(tostring(err or "余额不足，请换一个选择。"), {variant = "warning", duration = 3})
+        return
+    end
+    Navigate(GameLogic.State.phase or fallback)
 end
 
---- 顶部 HUD 状态栏（天数+职级+资金）
-local function CreateHUD()
+local function HUD()
     local s = GameLogic.State
-    local levelData = GameLogic.GetLevelData(s.currentLevel)
-    return UI.Panel {
-        width = "100%", padding = 10, paddingLeft = 14, paddingRight = 14,
-        backgroundColor = C.panelDark,
-        flexDirection = "row",
-        justifyContent = "space-between",
-        alignItems = "center",
-        children = {
-            UI.Label {
-                text = "Day " .. s.currentDay .. "/" .. s.maxDays,
-                fontSize = 12, fontColor = C.textYellow,
-            },
-            UI.Label {
-                text = levelData.icon .. " Lv." .. s.currentLevel .. " " .. levelData.name,
-                fontSize = 12, fontColor = C.textWhite,
-            },
-            UI.Label {
-                text = "¥" .. s.money,
-                fontSize = 12, fontColor = C.textGold,
-            },
-        },
-    }
+    return Art.HUD(s, GameLogic.GetLevelData(s.currentLevel).name)
 end
 
--- ============================================================================
--- 主菜单
--- ============================================================================
+local function Heading(kicker, title, subtitle)
+    return UI.Panel {width = "100%", padding = 16, gap = 5, children = {
+        Art.Text(kicker, 10, C.purple, {letterSpacing = 2}),
+        Art.Text(title, 25, C.ink, {fontWeight = "bold"}),
+        Art.Text(subtitle, 12, C.muted, {width = "100%"}),
+    }}
+end
+
+local function Sheet(title, subtitle, children, background)
+    local card = Art.Paper(children, {width = "100%", maxWidth = 660, alignSelf = "center", padding = 22, gap = 14})
+    local body = UI.Panel {width = "100%", padding = 18, gap = 12, children = {card}}
+    local heading = Heading("AFTER HOURS / 酒桌手记", title, subtitle)
+    heading:SetStyle({backgroundColor = {246, 239, 220, 238}})
+    return Art.Root({Art.Safe({heading,
+        UI.ScrollView {width = "100%", flexGrow = 1, flexBasis = 0, scrollY = true, children = {body}}})}, background)
+end
+
 function Screens.CreateMainMenu()
-    return UI.Panel {
-        width = "100%", height = "100%",
-        backgroundColor = C.bgWarm,
-        justifyContent = "center",
-        alignItems = "center",
-        children = {
-            UI.Panel {
-                alignItems = "center", gap = 8, marginBottom = 40,
-                children = {
-                    UI.Label { text = "🍻", fontSize = 64 },
-                    UI.Label {
-                        text = "酒桌文化",
-                        fontSize = 36, fontWeight = "bold",
-                        fontColor = { 60, 30, 0, 255 },
-                    },
-                    UI.Label {
-                        text = "职场应酬生存模拟器 · v1.2",
-                        fontSize = 13,
-                        fontColor = { 100, 60, 20, 180 },
-                    },
-                },
-            },
-            UI.Panel {
-                width = 260, gap = 12, alignItems = "center",
-                children = {
-                    UI.Button {
-                        text = "🎲  开始入职",
-                        width = 220, height = 48,
-                        variant = "primary",
-                        fontSize = 17,
-                        onClick = function()
-                            GameLogic.StartNewGame()
-                            if onScreenChange_ then onScreenChange_("select_workplace") end
-                        end,
-                    },
-                    UI.Button {
-                        text = "🎲  摇骰子演示",
-                        width = 220, height = 48,
-                        fontSize = 17,
-                        onClick = function()
-                            if onScreenChange_ then onScreenChange_("dice_demo") end
-                        end,
-                    },
-                    UI.Label {
-                        text = "5天内从实习生卷到老板",
-                        fontSize = 11, fontColor = { 80, 40, 0, 160 },
-                        marginTop = 8,
-                    },
-                },
-            },
-            UI.Label {
-                text = "适度饮酒，拒绝酒驾",
-                fontSize = 10, fontColor = { 100, 60, 20, 100 },
-                marginTop = 50,
-            },
-        },
-    }
+    return MainMenu.Create(function()
+        resultCache = {}
+        GameLogic.StartNewGame()
+        Navigate("select_workplace")
+    end, function()
+        UI.SetRoot(Screens.CreateArtGallery(), true)
+    end, function()
+        Navigate("dice_demo")
+    end)
 end
 
--- ============================================================================
--- 通用选择列表
--- ============================================================================
-local function CreateSelectionScreen(title, subtitle, items, onSelect, extraHeader)
+local workplaceScenes = {internet = "craftbeer", state = "biz_chinese", realestate = "dapaidang",
+    finance = "michelin", media = "izakaya", game = "hotpot", startup = "bbq", factory = "flyshop"}
+
+local function Visual(item, kind)
+    if kind == "character" then return Art.Character(item, true), "cover" end
+    if kind == "restaurant" then return Art.Pick(item.thumbnail, item.background, Art.Background(item)), "cover" end
+    if kind == "workplace" then return Art.Pick(item.thumbnail, item.background,
+        Art.Background({id = workplaceScenes[item.id]})), "cover" end
+    if kind == "drink" then return Art.Pick(item.thumbnail, A.drinks[item.id]), "contain" end
+    if kind == "brand" then return Art.Pick(item.thumbnail, A.drinks[(GameLogic.State.drinkType or {}).id]), "contain" end
+    return Art.Pick(item.thumbnail), "contain"
+end
+
+local function Details(item, kind)
+    local info = item.desc or item.special or ""
+    local tag = ""
+    if kind == "character" then
+        tag = "Lv." .. item.startLevel .. " 起步"
+        info = (item.desc or "") .. "\n【" .. (item.skill or "专属技能") .. "】" .. (item.skillDesc or "")
+    elseif kind == "workplace" then
+        tag = "难度 " .. (item.difficulty or 1) .. " / 5"
+    elseif kind == "restaurant" then
+        tag = "T" .. item.tier .. " · ¥" .. item.costPerPerson .. "/人"
+        info = info .. "\n双人席 ¥" .. item.costPerPerson * 2 .. " · 面子 +" .. (item.faceBonus or 0)
+    elseif kind == "drink" then
+        tag = "面子基数 +" .. (item.faceBase or 0)
+        info = "清醒影响 " .. (item.soberHit or 0) .. " / 杯"
+    elseif kind == "dish" then
+        tag = "T" .. (item.tier or 1) .. " · ¥" .. (item.cost or item.price or 0)
+        info = "面子 +" .. (item.face or 0) .. "  氛围 +" .. (item.vibe or 0) .. "\n清醒 +" .. (item.sober or 0)
+    elseif item.price then
+        tag = "¥" .. item.price
+        info = info .. "\n面子 +" .. (item.face or 0)
+    end
+    return tag, info
+end
+
+local function BudgetNotice()
+    local logic = GameLogic --[[@as table]]
+    if type(logic.GetBudgetStatus) ~= "function" then return nil end
+    local status = logic.GetBudgetStatus()
+    if not status or status.canContinue ~= false then return nil end
+    return Art.Paper({
+        Art.Text("预算告急 · 今日饭局无法继续", 16, C.red, {fontWeight = "bold", width = "100%"}),
+        Art.Text(status.message or "当前余额无法支付任何完整饭局组合。", 12, C.ink, {width = "100%"}),
+        Art.Text("最低还需 ¥" .. tostring(status.minimumRequired or 0) .. " · 缺口 ¥" .. tostring(status.shortfall or 0),
+            12, C.red, {width = "100%"}),
+        Art.Button("预算不足，结束今日饭局", function()
+            if type(logic.EndDayForInsufficientBudget) ~= "function" then
+                UI.Toast.Show("预算结算接口尚未就绪。", {variant = "warning"})
+                return
+            end
+            local ok, err = logic.EndDayForInsufficientBudget()
+            if not ok then
+                UI.Toast.Show(tostring(err or "仍有可负担选择，请继续挑选。"), {variant = "warning", duration = 3})
+                return
+            end
+            Navigate(GameLogic.State.phase)
+        end, false, {width = "100%", id = "end_day_insufficient_budget"}),
+    }, {width = "100%", padding = 12, gap = 6, borderColor = C.red, id = "budget_notice"})
+end
+
+local function Selection(title, subtitle, items, kind, onSelect, withHUD)
     local cards = {}
-    for i, item in ipairs(items) do
-        -- 右侧信息文本
-        local rightText = ""
-        if item.costPerPerson then
-            rightText = "¥" .. item.costPerPerson .. "/人"
-        elseif item.price then
-            rightText = "¥" .. item.price
-        elseif item.startLevel then
-            local ld = GameData.Levels[item.startLevel]
-            rightText = "Lv." .. item.startLevel .. " " .. (ld and ld.name or "")
-        elseif item.difficulty then
-            rightText = string.rep("⭐", math.min(5, item.difficulty))
-        end
-
-        -- 副文本
-        local subText = item.desc or item.skillDesc or item.special or ""
-        if item.skill then
-            subText = "【" .. item.skill .. "】" .. (item.skillDesc or "")
-        end
-
-        table.insert(cards, UI.Panel {
-            width = "100%",
-            padding = 12,
-            backgroundColor = C.panelCard,
-            borderRadius = 10,
-            flexDirection = "row",
-            alignItems = "center",
-            gap = 10,
-            pointerEvents = "auto",
+    local selected = false
+    for index, item in ipairs(items or {}) do
+        local path, fit = Visual(item, kind)
+        local tag, description = Details(item, kind)
+        local picture = Art.Picture(path, {width = "100%", height = kind == "character" and 190 or 132, backgroundFit = fit})
+        local imageMat = UI.Panel {width = "100%", height = kind == "character" and 190 or 132,
+            backgroundColor = C.lilac, overflow = "hidden", pointerEvents = "none", children = {picture,
+                Art.Text(string.format("%02d", index), 11, C.ink, {position = "absolute", top = 5, left = 6,
+                    width = 28, minWidth = 28, textAlign = "center", paddingHorizontal = 0, backgroundColor = C.yellow})}}
+        local unaffordable = item.affordable == false
+        local card = Art.Paper({imageMat,
+            Art.Text(item.name, 17, unaffordable and C.muted or C.ink, {fontWeight = "bold", width = "100%"}),
+            Art.Text(tag, 12, unaffordable and C.muted or C.purple, {fontWeight = "bold", width = "100%"}),
+            Art.Text(description, 12, C.muted, {width = "100%"}),
+            Art.Text(unaffordable and "余额不足 · 点击查看" or "选择这张  →", 11, unaffordable and C.red or C.ink,
+                {alignSelf = "flex-end", minWidth = unaffordable and 140 or 90,
+                    backgroundColor = unaffordable and C.lilac or C.yellow, padding = 4}),
+        }, {padding = 10, gap = 7, minWidth = 0, pointerEvents = "box-only", id = kind .. "_" .. (item.id or index),
             onClick = function()
-                onSelect(item, i)
+                if selected then return end
+                selected = true
+                onSelect(item)
+                selected = false
             end,
-            children = {
-                UI.Label {
-                    text = item.icon or "📌",
-                    fontSize = 26, width = 36, textAlign = "center",
-                },
-                UI.Panel {
-                    flex = 1, gap = 2,
-                    children = {
-                        UI.Label {
-                            text = item.name,
-                            fontSize = 15, fontWeight = "bold",
-                            fontColor = C.textWhite,
-                        },
-                        UI.Label {
-                            text = subText,
-                            fontSize = 11, fontColor = C.textGray,
-                        },
-                    },
-                },
-                UI.Label {
-                    text = rightText,
-                    fontSize = 12, fontColor = C.textYellow,
-                },
-            },
-        })
+            onPointerEnter = function(_, widget) widget:SetStyle({borderColor = C.purple, translateY = -2}) end,
+            onPointerLeave = function(_, widget) widget:SetStyle({borderColor = C.ink, translateY = 0}) end,
+            transition = "translateY 0.12s easeOut"})
+        cards[#cards + 1] = card
     end
-
-    local headerChildren = {
-        UI.Label {
-            text = title,
-            fontSize = 18, fontWeight = "bold",
-            fontColor = C.textYellow,
-        },
-    }
-    if subtitle and subtitle ~= "" then
-        table.insert(headerChildren, UI.Label {
-            text = subtitle,
-            fontSize = 11, fontColor = C.textGray,
-        })
-    end
-
-    local bodyChildren = {}
-    -- 额外头部（如 HUD）
-    if extraHeader then
-        table.insert(bodyChildren, extraHeader)
-    end
-    -- 标题区
-    table.insert(bodyChildren, UI.Panel {
-        width = "100%", padding = 14,
-        backgroundColor = C.panelDark,
-        alignItems = "center", gap = 3,
-        children = headerChildren,
-    })
-    -- 列表
-    table.insert(bodyChildren, UI.ScrollView {
-        flex = 1, flexBasis = 0,
-        width = "100%",
-        padding = 14,
-        contentContainerStyle = { gap = 8, paddingBottom = 20 },
-        children = cards,
-    })
-
-    return UI.Panel {
-        width = "100%", height = "100%",
-        backgroundColor = C.bgDark,
-        flexDirection = "column",
-        children = bodyChildren,
-    }
+    if #cards == 0 then cards[1] = Art.Paper({Art.Text("暂时没有可选项。", 15), Art.Text("请确认数据接口已就绪。", 12, C.muted)}) end
+    local grid = UI.SimpleGrid {width = "100%", minColumnWidth = 210, gap = 14, children = cards}
+    local list = UI.Panel {width = "100%", padding = 18, paddingBottom = 30, children = {grid}}
+    local children = {}
+    if withHUD then children[#children + 1] = HUD() end
+    children[#children + 1] = Heading("PREPARATION / 赴宴准备", title, subtitle)
+    children[#children + 1] = UI.ScrollView {width = "100%", flexGrow = 1, flexBasis = 0, scrollY = true,
+        showScrollbar = true, children = {list}}
+    local budget = withHUD and BudgetNotice() or nil
+    if budget then children[#children + 1] = budget end
+    children[#children + 1] = Art.Text("向下滚动查看更多 · 点击照片卡片确认选择", 10, C.muted,
+        {width = "100%", textAlign = "center", padding = 8})
+    return Art.Root({Art.Safe(children)})
 end
 
--- ============================================================================
--- 开局选择阶段
--- ============================================================================
 function Screens.CreateWorkplaceSelect()
-    return CreateSelectionScreen(
-        "选择职场环境",
-        "不同环境，不同酒桌规矩",
-        GameData.Workplaces,
-        function(item)
-            GameLogic.SelectWorkplace(item)
-            if onScreenChange_ then onScreenChange_("select_character") end
-        end
-    )
+    return Selection("选择职场环境", "不同的公司，不同的酒桌规矩。", GameData.Workplaces, "workplace", function(item)
+        Select(GameLogic.SelectWorkplace, item, "select_character")
+    end)
 end
 
 function Screens.CreateCharacterSelect()
-    return CreateSelectionScreen(
-        "选择你的角色",
-        "角色决定起始职级和专属技能",
-        GameData.Characters,
-        function(item)
-            GameLogic.SelectCharacter(item)
-            if onScreenChange_ then onScreenChange_("day_start") end
-        end
-    )
-end
-
--- ============================================================================
--- 每日开始界面 (day_start)
--- ============================================================================
-function Screens.CreateDayStart()
-    local s = GameLogic.State
-    local levelData = GameLogic.GetLevelData(s.currentLevel)
-
-    -- 天数进度指示
-    local dayDots = {}
-    for d = 1, s.maxDays do
-        local dotColor = { 80, 80, 80, 255 }
-        local dotText = tostring(d)
-        if d < s.currentDay then
-            dotColor = C.green
-            dotText = "✓"
-        elseif d == s.currentDay then
-            dotColor = C.accent
-        end
-        table.insert(dayDots, UI.Panel {
-            width = 36, height = 36,
-            backgroundColor = dotColor,
-            borderRadius = 18,
-            justifyContent = "center", alignItems = "center",
-            children = {
-                UI.Label { text = dotText, fontSize = 14, fontColor = C.textWhite },
-            },
-        })
-        if d < s.maxDays then
-            table.insert(dayDots, UI.Panel {
-                width = 20, height = 2,
-                backgroundColor = d < s.currentDay and C.green or { 80, 80, 80, 255 },
-            })
-        end
+    local characters = {}
+    -- 普瑞斯属于隐藏对手；区域老板 boss 是可选玩家，不能混淆。
+    for _, item in ipairs(GameData.Characters) do
+        if item.id ~= "pu_rui_si" then characters[#characters + 1] = item end
     end
-
-    return UI.Panel {
-        width = "100%", height = "100%",
-        backgroundColor = C.bgDark,
-        justifyContent = "center",
-        alignItems = "center",
-        gap = 24,
-        children = {
-            -- 天数进度
-            UI.Panel {
-                flexDirection = "row", alignItems = "center", gap = 4,
-                children = dayDots,
-            },
-            -- 当日信息
-            UI.Panel {
-                alignItems = "center", gap = 8,
-                padding = 24,
-                backgroundColor = C.panelDark,
-                borderRadius = 16,
-                width = 300,
-                children = {
-                    UI.Label {
-                        text = "第 " .. s.currentDay .. " 天",
-                        fontSize = 28, fontWeight = "bold",
-                        fontColor = C.textYellow,
-                    },
-                    UI.Label {
-                        text = levelData.icon .. " " .. levelData.name .. " (Lv." .. s.currentLevel .. ")",
-                        fontSize = 16, fontColor = C.textWhite,
-                    },
-                    UI.Label {
-                        text = "💰 余额 ¥" .. s.money,
-                        fontSize = 14, fontColor = C.textGold,
-                    },
-                    UI.Label {
-                        text = s.character.icon .. " " .. s.character.name .. " · " .. s.workplace.icon .. " " .. s.workplace.name,
-                        fontSize = 12, fontColor = C.textGray,
-                        marginTop = 4,
-                    },
-                    -- 被优化次数
-                    UI.Label {
-                        text = "❌ 被优化 " .. s.optimizeCount .. "/" .. s.maxOptimize,
-                        fontSize = 12,
-                        fontColor = s.optimizeCount > 0 and C.red or C.textGray,
-                        marginTop = 2,
-                    },
-                },
-            },
-            -- 开始按钮
-            UI.Button {
-                text = "🍻  出发赴宴",
-                width = 200, height = 46,
-                variant = "primary",
-                fontSize = 16,
-                onClick = function()
-                    GameLogic.StartDay()
-                    if onScreenChange_ then onScreenChange_(GameLogic.State.phase) end
-                end,
-            },
-        },
-    }
+    return Selection("选择你的角色", "从哪一级出发，由你决定。技能与身份将伴随整个职场旅程。", characters, "character", function(item)
+        Select(GameLogic.SelectCharacter, item, "day_start")
+    end)
 end
 
--- ============================================================================
--- 休息日界面 (rest_day)
--- ============================================================================
-function Screens.CreateRestDay()
-    local s = GameLogic.State
-    local msg = GameData.RestDayMessages[math.random(1, #GameData.RestDayMessages)]
-
-    return UI.Panel {
-        width = "100%", height = "100%",
-        backgroundColor = C.bgDark,
-        justifyContent = "center",
-        alignItems = "center",
-        gap = 20,
-        children = {
-            UI.Label { text = "😴", fontSize = 64 },
-            UI.Label {
-                text = "休息日",
-                fontSize = 24, fontWeight = "bold",
-                fontColor = C.textWhite,
-            },
-            UI.Panel {
-                width = 300, padding = 20,
-                backgroundColor = C.panelDark,
-                borderRadius = 14,
-                alignItems = "center",
-                children = {
-                    UI.Label {
-                        text = msg,
-                        fontSize = 14,
-                        fontColor = C.textGray,
-                        textAlign = "center",
-                        whiteSpace = "normal",
-                    },
-                },
-            },
-            UI.Label {
-                text = "Day " .. s.currentDay .. "/" .. s.maxDays .. " · 职级不变",
-                fontSize = 12, fontColor = C.textGray,
-            },
-            UI.Button {
-                text = "💤  结束休息 → 下一天",
-                width = 220, height = 44,
-                variant = "secondary",
-                fontSize = 14,
-                onClick = function()
-                    GameLogic.EndRestDay()
-                    if onScreenChange_ then onScreenChange_(GameLogic.State.phase) end
-                end,
-            },
-        },
-    }
-end
-
--- ============================================================================
--- 每日选择阶段（带HUD）
--- ============================================================================
 function Screens.CreateRestaurantSelect()
-    local s = GameLogic.State
-    local available = GameLogic.GetAvailableRestaurants()
-    local minTier, maxTier = GameData.GetTierRange(s.currentLevel)
-    return CreateSelectionScreen(
-        "选择饭局场地",
-        "Tier " .. minTier .. "-" .. maxTier .. " · 余额 ¥" .. s.money,
-        available,
-        function(item)
-            GameLogic.SelectRestaurant(item)
-            if onScreenChange_ then onScreenChange_("select_drink_type") end
-        end,
-        CreateHUD()
-    )
+    local minTier, maxTier = GameData.GetTierRange(GameLogic.State.currentLevel)
+    return Selection("今晚，在哪张桌子？", "已解锁 T" .. minTier .. "—T" .. maxTier .. " · 场地费用按双人席计算。",
+        GameLogic.GetAvailableRestaurants(), "restaurant", function(item)
+            Select(GameLogic.SelectRestaurant, item, "select_drink_type")
+        end, true)
 end
 
 function Screens.CreateDrinkTypeSelect()
-    return CreateSelectionScreen(
-        "选什么类型的酒",
-        "酒的类型影响面子和清醒度",
-        GameData.DrinkTypes,
-        function(item)
-            GameLogic.SelectDrinkType(item)
-            if onScreenChange_ then onScreenChange_("select_drink_brand") end
-        end,
-        CreateHUD()
-    )
+    return Selection("选一杯开场白", "排面还是清醒？也可以以茶代酒。", GameData.DrinkTypes, "drink", function(item)
+        Select(GameLogic.SelectDrinkType, item, "select_drink_brand")
+    end, true)
 end
 
 function Screens.CreateDrinkBrandSelect()
+    local drink = GameLogic.State.drinkType or {}
+    return Selection("为饭局挑个品牌", (drink.name or "酒水") .. " · 量力而行，预算也是实力的一部分。",
+        GameLogic.GetAvailableBrands(), "brand", function(item)
+            local ok, err = GameLogic.SelectDrinkBrand(item)
+            if ok == false then UI.Toast.Show(tostring(err or "余额不足"), {variant = "warning"}); return end
+            -- 老版 GameLogic 仍返回 playing，新版返回 select_dish；一律先展示点菜页。
+            Navigate("select_dish")
+        end, true)
+end
+
+function Screens.CreateDishSelect()
+    -- 接口通过 table 收窄兼容并行数据/逻辑更新，不在 UI 层更改预算或菜品属性。
+    local logic = GameLogic --[[@as table]]
+    if type(logic.GetAvailableDishes) == "function" and type(logic.SelectDish) == "function" then
+        return Selection("再点几道好菜", "菜品会影响面子、氛围与清醒度 · 选择一道后正式开席。",
+            logic.GetAvailableDishes(), "dish", function(item)
+                Select(logic.SelectDish, item, "playing")
+            end, true)
+    end
+    return Sheet("菜品准备中", "当前玩法版本尚未提供点菜接口。", {
+        Art.Text("新版菜品接口接入后，这里将显示可选菜品及价格。", 15),
+        Art.Button("继续旧版饭局", function() Navigate("playing") end),
+    })
+end
+
+function Screens.CreateDayStart()
     local s = GameLogic.State
-    local brands = GameLogic.GetAvailableBrands()
-    return CreateSelectionScreen(
-        "选一个品牌",
-        s.drinkType.name .. " · 余额 ¥" .. s.money,
-        brands,
-        function(item)
-            GameLogic.SelectDrinkBrand(item)
-            if onScreenChange_ then onScreenChange_("playing") end
-        end,
-        CreateHUD()
-    )
+    local character, workplace = s.character or {}, s.workplace or {}
+    local progress = {}
+    for day = 1, s.maxDays do
+        progress[#progress + 1] = UI.Panel {width = 34, height = 34, alignItems = "center", justifyContent = "center",
+            backgroundColor = day == s.currentDay and C.yellow or (day < s.currentDay and C.lilac or C.paper),
+            borderWidth = 2, borderColor = C.ink, children = {Art.Text(tostring(day), 13)}}
+    end
+    return Sheet("第 " .. s.currentDay .. " 天", "新的饭局，新的生存机会。", {
+        UI.Panel {flexDirection = "row", flexWrap = "wrap", gap = 8, children = progress},
+        UI.Panel {flexDirection = "row", alignItems = "center", gap = 16, children = {
+            Art.Picture(Art.Character(character, true), {width = 86, height = 104}),
+            UI.Panel {flexGrow = 1, flexShrink = 1, flexBasis = 0, gap = 5, children = {
+                Art.Text(character.name, 23, C.ink, {fontWeight = "bold"}),
+                Art.Text(workplace.name, 13, C.muted),
+                Art.Text("Lv." .. s.currentLevel .. " " .. GameLogic.GetLevelData(s.currentLevel).name, 14, C.purple),
+            }}, Art.Badge(s.currentLevel, 58)}},
+        Art.StatRow("今日预算", "¥" .. s.money),
+        Art.StatRow("被优化次数", s.optimizeCount .. " / " .. s.maxOptimize, s.optimizeCount > 0 and C.red or C.muted),
+        Art.Text((character.skill or "专属技能") .. " / " .. (character.skillDesc or ""), 13, C.muted),
+        Art.Button("出发赴宴  →", function() GameLogic.StartDay(); Navigate(s.phase) end),
+    })
 end
 
--- ============================================================================
--- 骰子音效（模块级单例，避免每回合重建场景）
--- ============================================================================
-local diceAudio_ = { scene = nil, roll = nil, land = nil }
-
-local function PlayDiceSound(landing)
-    if not diceAudio_.scene then
-        diceAudio_.scene = Scene()
-        local node = diceAudio_.scene:CreateChild("DiceAudio")
-        diceAudio_.roll = node:CreateComponent("SoundSource")
-        diceAudio_.land = node:CreateComponent("SoundSource")
-    end
-    local source = landing and diceAudio_.land or diceAudio_.roll
-    local path = landing and "audio/sfx/dice_land.mp3" or "audio/sfx/dice_roll.mp3"
-    local sound = cache:GetResource("Sound", path)
-    if source and sound then
-        source:Play(sound, sound:GetFrequency(), landing and 0.75 or 0.6)
-    end
+function Screens.CreateRestDay()
+    local s = GameLogic.State
+    local messages = GameData.RestDayMessages
+    return Sheet("今天，不上酒桌", "DAY " .. s.currentDay .. " / " .. s.maxDays .. " · 休息日", {
+        Art.Picture(A.drinks.tea, {width = 110, height = 110, alignSelf = "center"}),
+        Art.Text(messages[math.random(1, #messages)], 20, C.ink, {width = "100%", textAlign = "center"}),
+        Art.Text("职级不变。偶尔离开饭局，也是生存策略。", 13, C.muted),
+        Art.Button("好好休息，明天继续", function() GameLogic.EndRestDay(); Navigate(s.phase) end, true),
+    }, Art.Background({id = "flyshop"}))
 end
 
--- ============================================================================
--- 游戏进行界面 (playing)
--- 流程：点击摇骰 → 双方骰子同时翻滚 → 落定揭晓 → 出现对话选项
--- ============================================================================
 function Screens.CreateGameScreen()
-    local s = GameLogic.State
-
-    -- 先由数据层决定本回合结果与事件，动画只负责"演"出来
-    local playerRoll, opponentRoll = GameLogic.RollDice()
-    local event = GameLogic.GetNextEvent()
-
-    if not event then
-        -- 没有事件了 → 进入日结算
-        s.phase = "day_result"
-        if onScreenChange_ then onScreenChange_("day_result") end
-        return UI.Panel { width = "100%", height = "100%" }
-    end
-
-    -- ------------------------------------------------------------------
-    -- 选项按钮（初始隐藏，摇骰结束后才出现）
-    -- ------------------------------------------------------------------
-    local choiceButtons = {}
-    for i, choice in ipairs(event.choices) do
-        table.insert(choiceButtons, UI.Panel {
-            width = "100%",
-            padding = 12,
-            backgroundColor = { 55, 60, 78, 235 },
-            borderRadius = 10,
-            borderWidth = 1,
-            borderColor = { 90, 100, 130, 80 },
-            pointerEvents = "auto",
-            onClick = function()
-                GameLogic.MakeChoice(i)
-                local phase = GameLogic.State.phase
-                if onScreenChange_ then onScreenChange_(phase) end
-            end,
-            children = {
-                UI.Label {
-                    text = choice.text,
-                    fontSize = 14,
-                    fontColor = C.textWhite,
-                    whiteSpace = "normal",
-                },
-            },
-        })
-    end
-
-    -- ------------------------------------------------------------------
-    -- 双方立体骰子
-    -- ------------------------------------------------------------------
-    local playerDice = Dice3D.View { styleKey = "classic", width = 130, height = 145 }
-    local opponentDice = Dice3D.View { styleKey = "classic", width = 130, height = 145 }
-
-    -- ------------------------------------------------------------------
-    -- 摇骰按钮 与 结果提示
-    -- ------------------------------------------------------------------
-    local rollButton = UI.Button {
-        text = "🎲  摇骰子",
-        width = 190, height = 46,
-        variant = "primary",
-        fontSize = 16,
-    }
-
-    local resultLabel = UI.Label {
-        text = "点击摇骰子，看看谁掌握话语权",
-        fontSize = 12,
-        fontColor = C.textGray,
-        textAlign = "center",
-    }
-
-    -- ------------------------------------------------------------------
-    -- 对话区（事件文本 + 选项，初始隐藏）
-    -- ------------------------------------------------------------------
-    local dialogArea = UI.Panel {
-        width = "100%",
-        flex = 1, flexBasis = 0,
-        flexDirection = "column",
-        children = {
-            -- 事件文本
-            UI.Panel {
-                width = "100%", paddingLeft = 14, paddingRight = 14, paddingBottom = 8,
-                children = {
-                    UI.Panel {
-                        width = "100%", padding = 14,
-                        backgroundColor = { 40, 45, 60, 245 },
-                        borderRadius = 10,
-                        borderWidth = 1, borderColor = C.accent,
-                        children = {
-                            UI.Label {
-                                text = event.text,
-                                fontSize = 14, fontColor = C.textWhite,
-                                whiteSpace = "normal",
-                            },
-                        },
-                    },
-                },
-            },
-            -- 选项
-            UI.ScrollView {
-                flex = 1, flexBasis = 0,
-                width = "100%",
-                padding = 14,
-                contentContainerStyle = { gap = 8, paddingBottom = 16 },
-                children = choiceButtons,
-            },
-        },
-    }
-
-    -- ------------------------------------------------------------------
-    -- 摇骰流程控制
-    -- ------------------------------------------------------------------
-    local diceDone, rollStarted = 0, false
-
-    -- 落定后揭晓结果并放出对话
-    local function FinishRoll()
-        -- 骰子胜负判定
-        local diceResult = GameLogic.GetDiceResult()
-        if diceResult == "tie" then
-            resultLabel:SetText("🍻 平局！干杯事件触发")
-            resultLabel:SetFontColor(C.textYellow)
-        elseif diceResult == "advantage" then
-            resultLabel:SetText("💪 你占优势，主动出击")
-            resultLabel:SetFontColor(C.green)
-        else
-            resultLabel:SetText("😅 对方占优势，小心应对")
-            resultLabel:SetFontColor(C.accent)
-        end
-
-        -- 显示对话区，收起摇骰按钮
-        dialogArea:Show()
-        rollButton:Hide()
-    end
-
-    -- 两颗骰子都落定后才揭晓
-    local function OnDiceComplete()
-        diceDone = diceDone + 1
-        if diceDone >= 2 then
-            FinishRoll()
-        end
-    end
-
-    playerDice.props.onLand = function() PlayDiceSound(true) end
-    opponentDice.props.onLand = function() PlayDiceSound(true) end
-    playerDice.props.onComplete = OnDiceComplete
-    opponentDice.props.onComplete = OnDiceComplete
-
-    -- 点击摇骰：双方同时翻滚
-    rollButton.props.onClick = function()
-        if rollStarted then return end
-        rollStarted = true
-        rollButton:SetDisabled(true)
-        rollButton:SetText("翻滚中…")
-        resultLabel:SetText("骰子翻滚中…")
-        PlayDiceSound(false)
-        playerDice:Roll(playerRoll)
-        opponentDice:Roll(opponentRoll)
-    end
-
-    -- ------------------------------------------------------------------
-    -- 组装界面
-    -- ------------------------------------------------------------------
-    local root = UI.Panel {
-        width = "100%", height = "100%",
-        backgroundColor = C.bgDark,
-        flexDirection = "column",
-        children = {
-            -- HUD
-            CreateHUD(),
-            -- 属性条
-            UI.Panel {
-                width = "100%", paddingLeft = 14, paddingRight = 14, paddingTop = 6, paddingBottom = 6,
-                flexDirection = "row", gap = 8,
-                children = {
-                    UI.Panel { flex = 1, children = { AttrBar("好感", s.favor, C.green) } },
-                    UI.Panel { flex = 1, children = { AttrBar("清醒", s.sober, C.blue) } },
-                    UI.Panel { flex = 1, children = { AttrBar("氛围", s.vibe, C.purple) } },
-                },
-            },
-            -- 骰子对战区（摇骰阶段独占空间并垂直居中）
-            UI.Panel {
-                flex = 1, flexBasis = 0,
-                width = "100%",
-                flexDirection = "column",
-                justifyContent = "center",
-                alignItems = "center",
-                children = {
-                    -- 双方骰子
-                    UI.Panel {
-                        flexDirection = "row",
-                        justifyContent = "center", alignItems = "center",
-                        children = {
-                            playerDice,
-                            UI.Label {
-                                text = "VS", fontSize = 14, fontColor = C.textGray,
-                                marginLeft = 10, marginRight = 10,
-                            },
-                            opponentDice,
-                        },
-                    },
-                    -- 回合提示
-                    UI.Label {
-                        text = "回合 " .. s.round .. "/" .. s.maxRounds,
-                        fontSize = 11, fontColor = C.textGray, textAlign = "center",
-                        marginTop = 4,
-                    },
-                    -- 结果提示
-                    UI.Panel {
-                        width = "100%", paddingTop = 8, paddingBottom = 8,
-                        alignItems = "center",
-                        children = { resultLabel },
-                    },
-                    -- 摇骰按钮
-                    rollButton,
-                },
-            },
-            -- 对话区（摇骰结束后显示）
-            dialogArea,
-        },
-    }
-
-    -- 对话区初始隐藏（构建后再隐藏，确保 Yoga display 同步）
-    dialogArea:Hide()
-
-    return root
+    return Playing.Create(Navigate)
 end
 
--- ============================================================================
--- 每日结算界面 (day_result)
--- ============================================================================
 function Screens.CreateDayResult()
     local s = GameLogic.State
-    local result = GameLogic.GetBanquetResult()
-    local resultMsg = GameLogic.GetResultMessage(result)
-
-    -- 应用结果
-    local levelBefore = s.currentLevel
-    GameLogic.ApplyBanquetResult(result)
-    local levelAfter = s.currentLevel
-
-    -- 结果颜色和图标
-    local resultInfo = {
-        promote   = { icon = "🎉", label = "升职！", color = C.green },
-        maintain  = { icon = "😐", label = "原地踏步", color = C.textGray },
-        demote    = { icon = "📉", label = "降级...", color = C.accent },
-        optimized = { icon = "💀", label = "被优化！", color = C.red },
-    }
-    local info = resultInfo[result] or resultInfo.maintain
-
-    -- 职级变化显示
-    local levelBeforeData = GameLogic.GetLevelData(levelBefore)
-    local levelAfterData = GameLogic.GetLevelData(levelAfter)
-    local levelChangeText = levelBeforeData.icon .. " Lv." .. levelBefore .. " " .. levelBeforeData.name
-    if levelBefore ~= levelAfter then
-        levelChangeText = levelChangeText .. "  →  " .. levelAfterData.icon .. " Lv." .. levelAfter .. " " .. levelAfterData.name
+    -- 构建/重进页面不得重复应用日结算。缓存只读展示结果，不替代玩法判定。
+    if resultCache.state ~= s or resultCache.day ~= s.currentDay or resultCache.history ~= s.dayHistory then
+        local result = GameLogic.GetBanquetResult()
+        resultCache = {state = s, day = s.currentDay, history = s.dayHistory,
+            result = result, message = GameLogic.GetResultMessage(result), before = s.currentLevel}
+        GameLogic.ApplyBanquetResult(result)
+        resultCache.after = s.currentLevel
     end
-
-    return UI.Panel {
-        width = "100%", height = "100%",
-        backgroundColor = C.bgDark,
-        justifyContent = "center",
-        alignItems = "center",
-        gap = 16,
-        children = {
-            -- Day 标记
-            UI.Label {
-                text = "第 " .. s.currentDay .. " 天 结算",
-                fontSize = 13, fontColor = C.textGray,
-            },
-            -- 结果图标
-            UI.Label { text = info.icon, fontSize = 56 },
-            UI.Label {
-                text = info.label,
-                fontSize = 24, fontWeight = "bold",
-                fontColor = info.color,
-            },
-            -- 描述
-            UI.Panel {
-                width = 300, padding = 16,
-                backgroundColor = C.panelDark,
-                borderRadius = 12,
-                alignItems = "center", gap = 8,
-                children = {
-                    UI.Label {
-                        text = resultMsg,
-                        fontSize = 14, fontColor = C.textWhite,
-                        textAlign = "center",
-                        whiteSpace = "normal",
-                    },
-                    UI.Divider { marginTop = 6, marginBottom = 6 },
-                    -- 职级变化
-                    UI.Label {
-                        text = levelChangeText,
-                        fontSize = 13,
-                        fontColor = levelBefore ~= levelAfter and C.textYellow or C.textGray,
-                        textAlign = "center",
-                    },
-                    -- 被优化计数
-                    UI.Label {
-                        text = "❌ 被优化 " .. s.optimizeCount .. "/" .. s.maxOptimize,
-                        fontSize = 12,
-                        fontColor = s.optimizeCount > 0 and C.red or C.textGray,
-                    },
-                },
-            },
-            -- 属性回顾
-            UI.Panel {
-                width = 300, padding = 12, gap = 4,
-                backgroundColor = C.panelCard,
-                borderRadius = 10,
-                children = {
-                    AttrBar("好感度", s.favor, C.green),
-                    AttrBar("清醒度", s.sober, C.blue),
-                    AttrBar("氛围值", s.vibe, C.purple),
-                    AttrBar("尊严值", s.dignity, C.accent),
-                },
-            },
-            -- 继续按钮
-            UI.Button {
-                text = "→  继续",
-                width = 200, height = 44,
-                variant = "primary",
-                fontSize = 15,
-                onClick = function()
-                    GameLogic.ProceedAfterResult()
-                    if onScreenChange_ then onScreenChange_(GameLogic.State.phase) end
-                end,
-            },
-        },
-    }
+    local labels = {promote = "升职通知", maintain = "平稳落席", demote = "岗位调整", optimized = "优化预警"}
+    local colors = {promote = C.green, maintain = C.purple, demote = C.red, optimized = C.red}
+    return Sheet(labels[resultCache.result] or "饭局结算", "第 " .. s.currentDay .. " 天 · 饭局复盘", {
+        UI.Panel {flexDirection = "row", alignItems = "center", gap = 12, children = {
+            Art.Picture(Art.Character(s.character, true), {width = 82, height = 96}),
+            Art.Badge(resultCache.before, 64), Art.Text("→", 26, C.purple), Art.Badge(resultCache.after, 72),
+        }},
+        Art.Text(resultCache.message, 23, colors[resultCache.result], {fontWeight = "bold", width = "100%"}),
+        Art.Text("Lv." .. resultCache.before .. " " .. GameLogic.GetLevelData(resultCache.before).name .. "  →  Lv." ..
+            resultCache.after .. " " .. GameLogic.GetLevelData(resultCache.after).name, 14, C.purple, {width = "100%"}),
+        Art.Text((s --[[@as table]]).lastChoiceFeedback or "饭局结束，记得照顾好自己。", 13, C.muted),
+        Art.Stats(s, true),
+        Art.StatRow("被优化次数", s.optimizeCount .. " / " .. s.maxOptimize, s.optimizeCount > 0 and C.red or C.muted),
+        Art.StatRow("剩余资金", "¥" .. s.money),
+        Art.Button("收好工牌，继续  →", function() GameLogic.ProceedAfterResult(); Navigate(s.phase) end),
+    }, Art.Background(s.restaurant))
 end
 
--- ============================================================================
--- 终局界面 (game_over)
--- ============================================================================
 function Screens.CreateGameOver()
     local s = GameLogic.State
     local title = GameLogic.GetTitle()
-
-    -- 根据终局类型展示不同内容
-    local headerIcon, headerText, headerColor, headerDesc
+    local headline, description = "本次职场旅程结束", "饭局散场，故事还在继续。"
     if s.gameOverType == "win" then
-        headerIcon = "👔"
-        headerText = "通关！成为老板！"
-        headerColor = C.textGold
-        headerDesc = "从底层到顶层，你证明了自己！"
+        headline, description = "终于，坐上主位", "从底层到顶层，你拿到了属于自己的工牌。"
     elseif s.gameOverType == "fired" then
-        headerIcon = "📦"
-        headerText = "被开除了..."
-        headerColor = C.red
-        headerDesc = "被优化 " .. s.optimizeCount .. " 次，收拾东西走人吧"
-    else -- timeout
-        local rating = GameLogic.GetFinalRating()
-        headerIcon = "⏰"
-        headerText = rating.label
-        headerColor = C.textYellow
-        headerDesc = rating.msg
+        headline, description = "离席，也是一种结局", "被优化 " .. s.optimizeCount .. " 次。下一份工作，重新开始。"
+    else
+        local rating = GameLogic.GetFinalRating() --[[@as table]]
+        headline, description = rating.title or rating.label, rating.msg
     end
-
-    -- 天数历史
-    local historyItems = {}
-    for _, h in ipairs(s.dayHistory) do
-        local resultLabel = ({
-            promote = "↑升职", maintain = "—维持", demote = "↓降级",
-            optimized = "✗优化", rest = "💤休息",
-        })[h.result] or h.result
-        local resultColor = ({
-            promote = C.green, maintain = C.textGray, demote = C.accent,
-            optimized = C.red, rest = C.blue,
-        })[h.result] or C.textGray
-
-        table.insert(historyItems, UI.Panel {
-            width = "100%", flexDirection = "row", justifyContent = "space-between",
-            paddingTop = 3, paddingBottom = 3,
-            children = {
-                UI.Label { text = "Day " .. h.day, fontSize = 12, fontColor = C.textGray },
-                UI.Label { text = resultLabel, fontSize = 12, fontColor = resultColor },
-                UI.Label {
-                    text = "Lv." .. h.levelBefore .. "→" .. h.levelAfter,
-                    fontSize = 12, fontColor = C.textWhite,
-                },
-            },
-        })
+    ---@type Widget[]
+    local history = {Art.Text("每日手记 / CAREER LOG", 13, C.purple, {fontWeight = "bold"})}
+    local resultNames = {promote = "升职", maintain = "维持", demote = "降级", optimized = "被优化", rest = "休息"}
+    for _, item in ipairs(s.dayHistory) do
+        history[#history + 1] = Art.StatRow("DAY " .. item.day .. " · " .. (resultNames[item.result] or item.result),
+            "Lv." .. item.levelBefore .. " → " .. item.levelAfter)
     end
+    local record = Art.Paper(history, {width = "100%", padding = 12, gap = 9})
+    return Sheet(headline, description, {
+        UI.Panel {flexDirection = "row", gap = 16, alignItems = "center", children = {
+            Art.Picture(Art.Character(s.character, true), {width = 96, height = 114}),
+            UI.Panel {flexGrow = 1, flexShrink = 1, flexBasis = 0, gap = 5, children = {
+                Art.Text((s.character or {}).name, 21, C.ink, {fontWeight = "bold"}),
+                Art.Text((s.workplace or {}).name, 13, C.muted),
+                Art.Text("最终 Lv." .. s.currentLevel .. " " .. GameLogic.GetLevelData(s.currentLevel).name, 14, C.purple),
+            }}, Art.Badge(s.currentLevel, 72)}},
+        Art.Paper({Art.Text("本次获得称号", 11, C.yellow),
+            Art.Text(title.name, 26, C.paper, {fontWeight = "bold", width = "100%"}),
+            Art.Text(title.desc, 13, C.paper, {width = "100%"})}, {width = "100%"}, true),
+        Art.StatRow("起始职级", "Lv." .. s.startLevel .. " " .. GameLogic.GetLevelData(s.startLevel).name),
+        Art.StatRow("完成酒局", s.banquetCount .. " 场"),
+        Art.StatRow("被优化次数", s.optimizeCount .. " 次"),
+        Art.StatRow("总花费", "¥" .. s.totalSpent),
+        Art.StatRow("最高连续升职", s.maxConsecutive .. " 次"), record,
+        Art.Button("重新入职  →", function() resultCache = {}; GameLogic.Reset(); Navigate("menu") end),
+    })
+end
 
-    return UI.Panel {
-        width = "100%", height = "100%",
-        backgroundColor = C.bgWarm,
-        flexDirection = "column",
-        children = {
-            UI.ScrollView {
-                flex = 1, flexBasis = 0,
-                width = "100%",
-                contentContainerStyle = { padding = 24, gap = 14, alignItems = "center" },
-                children = {
-                    -- 头部
-                    UI.Label { text = headerIcon, fontSize = 56 },
-                    UI.Label {
-                        text = headerText,
-                        fontSize = 26, fontWeight = "bold",
-                        fontColor = headerColor,
-                    },
-                    UI.Label {
-                        text = headerDesc,
-                        fontSize = 14, fontColor = { 80, 40, 0, 200 },
-                        textAlign = "center",
-                        whiteSpace = "normal",
-                    },
-                    -- 统计
-                    UI.Panel {
-                        width = "90%", maxWidth = 360,
-                        padding = 14, gap = 6,
-                        backgroundColor = C.panelDark,
-                        borderRadius = 12,
-                        children = {
-                            StatRow("角色", s.character.icon .. " " .. s.character.name),
-                            StatRow("公司", s.workplace.icon .. " " .. s.workplace.name),
-                            StatRow("起始职级", "Lv." .. s.startLevel .. " " .. GameLogic.GetLevelData(s.startLevel).name),
-                            StatRow("最终职级", "Lv." .. s.currentLevel .. " " .. GameLogic.GetLevelData(s.currentLevel).name,
-                                s.currentLevel > s.startLevel and C.green or
-                                s.currentLevel < s.startLevel and C.red or C.textWhite),
-                            UI.Divider { marginTop = 4, marginBottom = 4 },
-                            StatRow("完成酒局", s.banquetCount .. " 场"),
-                            StatRow("被优化次数", s.optimizeCount .. " 次",
-                                s.optimizeCount > 0 and C.red or C.textWhite),
-                            StatRow("总花费", "¥" .. s.totalSpent),
-                            StatRow("最高连续升职", s.maxConsecutive .. " 次",
-                                s.maxConsecutive >= 3 and C.green or C.textWhite),
-                        },
-                    },
-                    -- 每天记录
-                    UI.Panel {
-                        width = "90%", maxWidth = 360,
-                        padding = 14, gap = 4,
-                        backgroundColor = C.panelDark,
-                        borderRadius = 12,
-                        children = {
-                            UI.Label { text = "📅 每日记录", fontSize = 13, fontColor = C.textYellow, marginBottom = 4 },
-                            table.unpack(historyItems),
-                        },
-                    },
-                    -- 称号
-                    UI.Panel {
-                        width = "90%", maxWidth = 360,
-                        padding = 16,
-                        backgroundColor = { 160, 50, 30, 230 },
-                        borderRadius = 12,
-                        alignItems = "center", gap = 4,
-                        children = {
-                            UI.Label { text = "鉴定结果", fontSize = 11, fontColor = { 255, 200, 150, 180 } },
-                            UI.Label {
-                                text = "【" .. title.name .. "】",
-                                fontSize = 20, fontWeight = "bold",
-                                fontColor = C.textYellow,
-                            },
-                            UI.Label {
-                                text = title.desc,
-                                fontSize = 12, fontColor = { 255, 220, 180, 200 },
-                            },
-                        },
-                    },
-                },
-            },
-            -- 底部按钮
-            UI.Panel {
-                width = "100%", padding = 16,
-                alignItems = "center",
-                children = {
-                    UI.Button {
-                        text = "🔄  重新入职",
-                        width = 220, height = 48,
-                        variant = "primary",
-                        fontSize = 16,
-                        onClick = function()
-                            GameLogic.Reset()
-                            if onScreenChange_ then onScreenChange_("menu") end
-                        end,
-                    },
-                },
-            },
-        },
-    }
+-- 图鉴是纯 UI 支路；不重置 State、不掺入开局选择、不展示隐藏对手。
+function Screens.CreateArtGallery()
+    local entries = {}
+    for _, item in ipairs(GameData.Characters) do
+        if item.id ~= "pu_rui_si" then
+            entries[#entries + 1] = Art.Paper({
+                Art.Picture(Art.Character(item), {width = "100%", height = 220}),
+                Art.Text(item.name, 18, C.ink, {fontWeight = "bold"}),
+                Art.Text(item.skillDesc or item.desc, 12, C.muted, {width = "100%"}),
+            }, {padding = 12, minWidth = 0})
+        end
+    end
+    for _, item in ipairs(GameData.Restaurants) do
+        entries[#entries + 1] = Art.Paper({Art.Picture(Art.Background(item), {width = "100%", height = 132, backgroundFit = "cover"}),
+            Art.Text(item.name, 16), Art.Text("TIER " .. item.tier, 11, C.purple)}, {padding = 10, minWidth = 0})
+    end
+    local grid = UI.SimpleGrid {width = "100%", minColumnWidth = 210, gap = 14, children = entries}
+    return Art.Root({Art.Safe({Heading("ART BOOK / 美术图鉴", "桌边人物与风景", "这里只翻阅美术，不改变游戏进度。"),
+        UI.ScrollView {width = "100%", flexGrow = 1, flexBasis = 0, children = {
+            UI.Panel {width = "100%", padding = 18, children = {grid}}}},
+        Art.Button("返回主菜单", function() Navigate("menu") end, true, {margin = 12}),
+    })})
+end
+
+function Screens.Shutdown()
+    Playing.Shutdown()
+    onScreenChange_ = nil
+    resultCache = {}
 end
 
 return Screens

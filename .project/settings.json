@@ -1,0 +1,44 @@
+{
+  "$schema": "../schemas/settings.schema.json",
+  "sources": {
+    "engine": {
+      "tag": "stable"
+    },
+    "engine-res": {
+      "tag": "stable"
+    },
+    "official-res": {
+      "tag": "stable"
+    }
+  },
+  "build": {
+    "generate_fs_path": true,
+    "output_dir": "../dist",
+    "asset_dirs": [
+      "../assets",
+      "../scripts"
+    ],
+    "asset_ignores": [
+      "../assets/image/Art/References",
+      "../assets/image/Art/UI/ui_attr_icons_sheet.png",
+      "../assets/image/Art/UI/ui_dialogue_bubble.png",
+      "../assets/image/Art/UI/ui_dialogue_bubble_single.png"
+    ]
+  },
+  "@runtime": {
+    "multiplayer": {
+      "enabled": false,
+      "max_players": 4,
+      "background_match": false,
+      "match_info": {
+        "desc_name": "free_match",
+        "immediately_start": true,
+        "match_timeout": 0,
+        "player_number": 1
+      },
+      "persistent_world": {
+        "enabled": false
+      }
+    }
+  }
+}
