@@ -40,7 +40,10 @@ AGENTS.md
 CLAUDE.md
 
 # Engine-generated project config (contains project_id / developer_id)
-.project/
+.project/project.json
+.project/project.json.meta
+.project/i18n.json
+.project/i18n.json.meta
 
 # Agent skill discovery dirs
 .agents/
