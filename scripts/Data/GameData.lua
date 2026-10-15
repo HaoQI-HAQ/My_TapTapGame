@@ -510,12 +510,25 @@ GameData.LiarsDice = {
     aiChallengeChance = 0.55,    -- 估算命中率不足时叫开的概率
 }
 
--- 性格标签：决定情报内容与对手行为倾向
+-- 性格标签：决定情报内容、对手行为倾向，以及「选对」的加成档位
+-- tierPref: 偏好的餐厅 Tier（用于选场地判定）
+-- pricePref: 偏好的酒价档位 "high" / "low"（用于选酒判定）
+-- dishPref: 偏好的菜品价档 "high" / "low"（用于选菜判定）
 GameData.Personalities = {
-    vain   = { id = "vain",   name = "爱慕虚荣", hint = "排面至上，越贵越有面子" },
-    humble = { id = "humble", name = "谦虚务实", hint = "看重实在，铺张反而扣分" },
-    blunt  = { id = "blunt",  name = "直爽豪迈", hint = "喜欢直来直去，讨厌客套" },
-    shrewd = { id = "shrewd", name = "精明算计", hint = "性价比优先，会算账" },
+    vain   = { id = "vain",   name = "爱慕虚荣", hint = "排面至上，越贵越有面子",
+               tierPref = "high", pricePref = "high", dishPref = "high" },
+    humble = { id = "humble", name = "谦虚务实", hint = "看重实在，铺张反而扣分",
+               tierPref = "low",  pricePref = "low",  dishPref = "low" },
+    blunt  = { id = "blunt",  name = "直爽豪迈", hint = "喜欢直来直去，讨厌客套",
+               tierPref = "any",  pricePref = "high", dishPref = "high" },
+    shrewd = { id = "shrewd", name = "精明算计", hint = "性价比优先，会算账",
+               tierPref = "low",  pricePref = "low",  dishPref = "low" },
+}
+
+-- 情报闭环：选对性格偏好时的加成
+GameData.IntelBonus = {
+    match   = { favor = 6,  vibe = 5,  face = 3,  desc = "投其所好" },
+    mismatch= { favor = -4, vibe = -3, desc = "没踩在点上" },
 }
 
 -- 情报问题：玩家赢得话语权后可问，每场最多问 1 个

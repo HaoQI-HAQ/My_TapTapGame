@@ -95,28 +95,32 @@ function Playing.Create(navigate)
         children = {Art.Text("?", 44, C.paper, {textAlign = "center"})},
     }
     local bidLabel = Art.Text("等待开局", 13, C.yellow, {width = "100%", textAlign = "center"})
+    -- 当前叫价（总和制，范围 2-12）
+    local bidValue = Art.Text("—", 26, C.yellow, {width = "100%", textAlign = "center", fontWeight = "bold"})
+    local bidCaption = Art.Text("当前叫价", 10, C.paper, {width = "100%", textAlign = "center"})
     local playerResult = Art.Text("我方  ?", 11, C.yellow, {textAlign = "center"})
     local opponentResult = Art.Text("对方  ?", 11, C.paper, {textAlign = "center"})
     local rollButton = Art.Button("开始大话骰", nil, false, {width = "100%", id = "roll_dice"})
     local diceRow = UI.Panel {flexDirection = "row", justifyContent = "center", alignItems = "center", children = {
         UI.Panel {alignItems = "center", children = {playerDice, playerResult}},
-        Art.Text("VS", 13, C.yellow, {marginHorizontal = 2}),
+        UI.Panel {alignItems = "center", paddingHorizontal = 8, children = {bidCaption, bidValue}},
         UI.Panel {alignItems = "center", children = {opponentHidden, opponentDice, opponentResult}},
     }}
-    -- 大话骰行动区：加码（比当前叫价大的点数）+ 叫开
+    -- 总和制加码：2-12 共 11 个按钮，低于当前叫价的置灰
     local raiseButtons = {}
-    for v = 1, 6 do
-        raiseButtons[v] = Art.Button(tostring(v), nil, true, {width = 40, minHeight = 34, paddingHorizontal = 0})
+    for v = 2, 12 do
+        raiseButtons[v] = Art.Button(tostring(v), nil, true,
+            {width = 38, minHeight = 32, paddingHorizontal = 0, fontSize = 13})
     end
     local challengeButton = Art.Button("叫开！", nil, false, {width = "100%", id = "liar_challenge"})
     local raiseRow = UI.Panel {width = "100%", flexDirection = "row", justifyContent = "center",
-        gap = 4, flexWrap = "wrap", children = raiseButtons}
+        gap = 3, flexWrap = "wrap", children = raiseButtons}
     local actionPanel = UI.Panel {width = "100%", gap = 4, children = {raiseRow, challengeButton}}
     actionPanel:Hide()
     local center = Art.Paper({
         Art.Text("ROUND " .. s.round .. " / " .. s.maxRounds, 11, C.yellow, {textAlign = "center"}),
         diceRow, bidLabel, rollButton, actionPanel,
-    }, {id = "dice_stage", width = 280, padding = 10, gap = 5, alignSelf = "center"}, true)
+    }, {id = "dice_stage", width = 300, padding = 10, gap = 5, alignSelf = "center"}, true)
     local playerTag = Art.Text(character.name or "我方", 12, C.ink, {
         position = "absolute", bottom = 5, left = 8, backgroundColor = C.yellow,
         paddingHorizontal = 8, paddingVertical = 3, width = 130, maxWidth = "40%", borderWidth = 1, borderColor = C.ink})
@@ -199,7 +203,10 @@ function Playing.Create(navigate)
         opponentHidden:Hide()
         opponentDice:Show()
         opponentDice:Roll(GameLogic.State.liar.opponentDie)
+        local sum = GameLogic.LiarActualSum()
         opponentResult:SetText("对方  " .. GameLogic.State.liar.opponentDie)
+        bidCaption:SetText("实际总和")
+        bidValue:SetText(tostring(sum))
     end
 
     -- 大话骰结束后：玩家赢 → 获得话语权（可问情报）；输 → 直接进对话
@@ -214,7 +221,6 @@ function Playing.Create(navigate)
         GameLogic.LiarFinish()
         actionPanel:Hide()
         rollButton:Hide()
-        -- 短暂停顿后进入对话（或情报问答）
         if winner == "player" and not GameLogic.State.intelUsedToday then
             ShowIntelQuestions()
         else
@@ -271,8 +277,9 @@ function Playing.Create(navigate)
     local function RunOpponentTurn()
         local action, bid = GameLogic.LiarOpponentTurn()
         if action == "raise" then
-            bidLabel:SetText("对方叫 " .. bid .. " 点 · 轮到你了")
+            bidLabel:SetText("对方叫 " .. bid .. " · 轮到你了")
             bidLabel:SetFontColor(C.lilac)
+            bidValue:SetText(tostring(bid))
         elseif action == "challenge" then
             RevealOpponentDie()
             bidLabel:SetText("对方叫开！")
@@ -280,8 +287,8 @@ function Playing.Create(navigate)
         end
     end
 
-    -- 玩家加码
-    for v = 1, 6 do
+    -- 玩家加码（2-12）
+    for v = 2, 12 do
         raiseButtons[v].props.onClick = function()
             if not alive or chosen then return end
             local L = GameLogic.State.liar
@@ -291,16 +298,19 @@ function Playing.Create(navigate)
                 UI.Toast.Show(tostring(err or "不能这么叫"), {variant = "warning", duration = 2})
                 return
             end
-            bidLabel:SetText("你叫 " .. v .. " 点")
+            bidLabel:SetText("你叫 " .. v)
+            bidValue:SetText(tostring(v))
             actionPanel:Hide()
             -- 对手思考后行动
             RunOpponentTurn()
             if GameLogic.State.liar.active then
-                bidLabel:SetText("对方叫 " .. GameLogic.State.liar.currentBid .. " 点 · 轮到你了")
+                local cur = GameLogic.State.liar.currentBid
+                bidLabel:SetText("对方叫 " .. cur .. " · 轮到你了")
+                bidValue:SetText(tostring(cur))
                 actionPanel:Show()
-                -- 只能叫比当前更大的点数
-                for i = 1, 6 do
-                    raiseButtons[i]:SetStyle({opacity = i > GameLogic.State.liar.currentBid and 1 or 0.35})
+                -- 只能叫比当前更大的数
+                for i = 2, 12 do
+                    raiseButtons[i]:SetStyle({opacity = i > cur and 1 or 0.3})
                 end
             end
         end
@@ -312,7 +322,7 @@ function Playing.Create(navigate)
         local L = GameLogic.State.liar
         if not L.active or L.turn ~= "player" then return end
         if L.currentBid == 0 then
-            UI.Toast.Show("还没人叫点数，不能叫开", {variant = "warning", duration = 2})
+            UI.Toast.Show("还没人叫价，不能叫开", {variant = "warning", duration = 2})
             return
         end
         GameLogic.LiarChallenge()
@@ -328,8 +338,9 @@ function Playing.Create(navigate)
         rollButton:Hide()
         PlaySound(false)
         local L = GameLogic.StartLiarRound()
-        bidLabel:SetText("你的骰子已就位 · 请叫点或叫开")
+        bidLabel:SetText("叫一个总和（2-12），或直接叫开")
         bidLabel:SetFontColor(C.yellow)
+        bidValue:SetText("—")
         playerResult:SetText("我方  " .. L.playerDie)
         playerDice:Roll(L.playerDie)
         -- 骰子落定后开放行动区
@@ -337,7 +348,7 @@ function Playing.Create(navigate)
             if not alive then return end
             PlaySound(true)
             actionPanel:Show()
-            for i = 1, 6 do
+            for i = 2, 12 do
                 raiseButtons[i]:SetStyle({opacity = 1})
             end
         end
@@ -345,10 +356,11 @@ function Playing.Create(navigate)
 
     -- 重排网格只移动已有选项，不重建骰子、不重新抽事件。
     Art.Responsive(root, function(w, h, narrow, short)
-        local diceSize = short and 46 or (narrow and 78 or 105)
+        local diceSize = short and 42 or (narrow and 72 or 96)
         playerDice:SetStyle({width = diceSize, height = diceSize + 8})
         opponentDice:SetStyle({width = diceSize, height = diceSize + 8})
-        center:SetStyle({width = short and 220 or (narrow and 230 or 280), padding = short and 6 or 10, gap = short and 2 or 5})
+        opponentHidden:SetStyle({width = diceSize, height = diceSize + 8})
+        center:SetStyle({width = short and 250 or (narrow and 260 or 300), padding = short and 6 or 10, gap = short and 2 or 5})
         local compactHeight = h <= 760
         stage:SetStyle({minHeight = short and 160 or 180, flexGrow = compactHeight and 0.8 or 1.1})
         bottom:SetStyle({flexGrow = compactHeight and 1.5 or 1,

@@ -95,6 +95,8 @@ GameLogic.State = {
     intelUsedToday = false,
     -- 每日对手性格（次日沿用同一对手池，情报有实际价值）
     opponentPersonality = nil, ---@type string|nil
+    -- 性格日程：开局预生成每天的性格，使「今日情报」能预测「明日对手」
+    personalitySchedule = {},  ---@type table<number, string>
 
     -- 历史记录
     dayHistory = {},    -- { day=1, result="promote", levelBefore=1, levelAfter=2 }
@@ -212,9 +214,25 @@ function GameLogic.SelectCharacter(character)
         s.maxOptimize = 3
     end
 
+    -- 预生成每天的性格日程：使今日情报能预测明日对手（情报闭环的前提）
+    local pool = {}
+    for _, p in pairs(GameData.Personalities) do pool[#pool + 1] = p.id end
+    s.personalitySchedule = {}
+    for day = 1, s.maxDays do
+        s.personalitySchedule[day] = pool[math.random(1, #pool)]
+    end
+    print("[Schedule] 性格日程：" .. table.concat(s.personalitySchedule, " / ", 1, s.maxDays))
+
     -- 进入第一天
     s.currentDay = 1
     s.phase = "day_start"
+end
+
+--- 获取指定天数的对手性格（默认今天）
+function GameLogic.GetDayPersonality(day)
+    local s = GameLogic.State
+    day = day or s.currentDay
+    return s.personalitySchedule[day] or "blunt"
 end
 
 -- ============================================================================
@@ -432,7 +450,9 @@ function GameLogic.SelectOpponent()
     -- 使用副本：最终回合切立绘不能污染静态数据或下一场。
     s.opponent = SelectionItem(opponent, 0)
     s.opponent.illustration = opponent.illustration or opponent.portrait
-    s.opponentPersonality = opponent.personality or "blunt"
+    -- 性格来自开局预生成的日程（今日情报可预测明日对手）；普老板固定精明算计
+    s.opponentPersonality = opponent.isBoss and (opponent.personality or "shrewd")
+        or GameLogic.GetDayPersonality(s.currentDay)
     print(string.format("[Opponent] day=%d tier=%d id=%s 性格=%s",
         s.currentDay, s.restaurant.tier, opponent.id, s.opponentPersonality))
     return s.opponent
@@ -448,6 +468,9 @@ function GameLogic.SelectRestaurant(restaurant)
     s.restaurant = item
     s.face = s.face + item.faceBonus
     GameLogic.SelectOpponent()
+    -- 情报闭环：场地是否符合对手性格偏好
+    local intelMsg = GameLogic.ApplyIntelMatch("place", item)
+    if intelMsg ~= "" then s.lastChoiceFeedback = intelMsg end
     s.phase = "select_drink_type"
     return true
 end
@@ -496,6 +519,9 @@ function GameLogic.SelectDrinkBrand(brand)
         s.favor = math.min(100, s.favor + 10)
         print("[Bonus] 飞天茅台 + 国企：好感+10（保留至酒局）")
     end
+    -- 情报闭环：酒价是否符合对手性格偏好
+    local intelMsg = GameLogic.ApplyIntelMatch("drink", item)
+    if intelMsg ~= "" then s.lastChoiceFeedback = intelMsg end
     s.phase = "select_dish"
     return true
 end
@@ -524,6 +550,9 @@ function GameLogic.SelectDish(dish)
     s.face = s.face + item.face
     s.vibe = math.max(0, math.min(100, s.vibe + item.vibe))
     s.sober = math.max(0, math.min(100, s.sober + item.sober))
+    -- 情报闭环：菜品是否符合对手性格偏好
+    local intelMsg = GameLogic.ApplyIntelMatch("dish", item)
+    if intelMsg ~= "" then s.lastChoiceFeedback = intelMsg end
     s.phase = "playing"
     print(string.format("[Banquet] id=%d dish=%s face=%d favor=%d", s.banquetId, item.id, s.face, s.favor))
     return true
@@ -602,15 +631,10 @@ function GameLogic.ResetBanquetStats()
 end
 
 -- ============================================================================
--- 骰子系统
--- ============================================================================
--- ============================================================================
--- 大话骰（简化版）
+-- 大话骰（总和制）
 -- 双方各 1 颗骰。玩家可见自己的点数，对手点数隐藏。
--- 轮流行动：加码（叫更大点数）或叫开（要求亮骰比对）。
--- 叫开时：若叫的点数 ≤ 实际点数（双方点数之和的最大值语义简化为对手点数），
--- 则叫开者输；反之加码者输。这里简化为单骰比较：
---   叫开者赢 = 当前叫的点数 > 对手实际点数（即加码者虚报）
+-- 叫价 = 猜测「双方骰子总和」（范围 2-12）。轮流行动：加码或叫开。
+-- 叫开判定：叫价 > 实际总和 → 叫开者赢（上家虚报）；否则叫开者输。
 -- ============================================================================
 
 --- 开始一回合的大话骰
@@ -628,35 +652,52 @@ function GameLogic.StartLiarRound()
     s.liar.revealOpponent = false
     s.liar.winner = nil
     s.liar.rounds = 0
-    print(string.format("[Liar] 开局 玩家骰=%d 对手骰=%d", s.liar.playerDie, s.liar.opponentDie))
+    print(string.format("[Liar] 开局 玩家骰=%d 对手骰=%d 总和=%d",
+        s.liar.playerDie, s.liar.opponentDie, s.liar.playerDie + s.liar.opponentDie))
     return s.liar
 end
 
---- 玩家加码：叫一个比当前更大的点数（1-6）
+--- 双方骰子实际总和
+function GameLogic.LiarActualSum()
+    local L = GameLogic.State.liar
+    return L.playerDie + L.opponentDie
+end
+
+--- 叫价上限：双方总和最大值 12
+function GameLogic.LiarMaxBid()
+    return 12
+end
+
+--- 玩家加码：叫一个比当前更大的总和数（2-12）
 function GameLogic.LiarRaise(bid)
     local s = GameLogic.State
     local L = s.liar
     if not L.active or L.turn ~= "player" then return false, "现在不是你的回合" end
-    if bid <= L.currentBid or bid > 6 then return false, "只能往上加码（1-6）" end
+    local minBid = math.max(2, L.currentBid + 1)
+    if bid < minBid or bid > 12 then
+        return false, string.format("只能叫 %d 到 12 之间", minBid)
+    end
     L.currentBid = bid
     L.rounds = L.rounds + 1
     L.turn = "opponent"
-    print(string.format("[Liar] 玩家加码 → %d", bid))
+    print(string.format("[Liar] 玩家叫 → %d", bid))
     return true
 end
 
---- 玩家叫开：要求亮骰
+--- 玩家叫开：要求亮骰，比较叫价与实际总和
 function GameLogic.LiarChallenge()
     local s = GameLogic.State
     local L = s.liar
     if not L.active or L.turn ~= "player" then return false, "现在不是你的回合" end
-    -- 对手虚报（叫的点数 > 对手实际点数）→ 玩家赢
-    local opponentBluffed = L.currentBid > L.opponentDie
+    if L.currentBid == 0 then return false, "还没人叫价，不能叫开" end
+    local sum = L.playerDie + L.opponentDie
+    -- 叫价 > 实际总和 → 上家虚报 → 叫开者赢
+    local opponentBluffed = L.currentBid > sum
     L.revealOpponent = true
     L.winner = opponentBluffed and "player" or "opponent"
     L.active = false
-    print(string.format("[Liar] 玩家叫开 bid=%d 对手骰=%d → %s胜",
-        L.currentBid, L.opponentDie, L.winner == "player" and "玩家" or "对手"))
+    print(string.format("[Liar] 玩家叫开 叫价=%d 总和=%d → %s胜",
+        L.currentBid, sum, L.winner == "player" and "玩家" or "对手"))
     return true, L.winner
 end
 
@@ -667,29 +708,29 @@ function GameLogic.LiarOpponentTurn()
     if not L.active or L.turn ~= "opponent" then return nil end
 
     local cfg = GameData.LiarsDice
-    -- 对手估算：自己点数 + 假设玩家平均值
-    local estimated = L.opponentDie + 3.5
-    -- 当前叫价已超出估算 → 倾向叫开
-    local shouldChallenge = L.currentBid >= estimated and math.random() < cfg.aiChallengeChance
-    -- 或者已经加码太多轮，避免死循环
-    if L.rounds >= 6 then shouldChallenge = true end
+    local sum = L.playerDie + L.opponentDie
+    -- 对手知道自己骰子，估算玩家平均 3.5
+    local estimatedSum = L.opponentDie + 3.5
+    -- 叫价已超出估算 → 倾向叫开
+    local shouldChallenge = L.currentBid >= estimatedSum and math.random() < cfg.aiChallengeChance
+    -- 加码轮数兜底，避免死循环
+    if L.rounds >= 5 then shouldChallenge = true end
 
     if shouldChallenge then
-        -- 对手叫开：判断玩家是否虚报
-        local playerBluffed = L.currentBid > L.playerDie
+        local playerBluffed = L.currentBid > sum
         L.revealOpponent = true
         L.winner = playerBluffed and "opponent" or "player"
         L.active = false
-        print(string.format("[Liar] 对手叫开 bid=%d 玩家骰=%d → %s胜",
-            L.currentBid, L.playerDie, L.winner == "player" and "玩家" or "对手"))
+        print(string.format("[Liar] 对手叫开 叫价=%d 总和=%d → %s胜",
+            L.currentBid, sum, L.winner == "player" and "玩家" or "对手"))
         return "challenge", L.currentBid
     end
 
-    -- 加码：在合理范围内往上叫，偶尔虚张声势
+    -- 加码：往上叫 1-2 点，偶尔虚张声势
     local nextBid = L.currentBid + math.random(1, 2)
-    if nextBid > 6 then
+    if nextBid > 12 then
         -- 无法再加，只能叫开
-        local playerBluffed = L.currentBid > L.playerDie
+        local playerBluffed = L.currentBid > sum
         L.revealOpponent = true
         L.winner = playerBluffed and "opponent" or "player"
         L.active = false
@@ -698,7 +739,7 @@ function GameLogic.LiarOpponentTurn()
     L.currentBid = nextBid
     L.rounds = L.rounds + 1
     L.turn = "player"
-    print(string.format("[Liar] 对手加码 → %d", nextBid))
+    print(string.format("[Liar] 对手叫 → %d", nextBid))
     return "raise", nextBid
 end
 
@@ -707,7 +748,6 @@ function GameLogic.LiarFinish()
     local s = GameLogic.State
     local L = s.liar
     local winner = L.winner or "opponent"
-    -- 玩家获胜 → 给予话语权奖励
     if winner == "player" then
         s.favor = math.min(100, s.favor + 5)
         print("[Liar] 玩家赢得话语权，好感+5")
@@ -753,10 +793,13 @@ function GameLogic.GetIntelQuestions()
 end
 
 --- 询问情报：返回答案文本与标签
+--- 情报指向「明日对手」的性格（今日预生成日程已确定），供次日选择参考
 function GameLogic.AskIntel(questionId)
     local s = GameLogic.State
     if s.intelUsedToday then return nil, "今天已经问过了" end
-    local personality = s.opponentPersonality or "blunt"
+    -- 询问的是明日对手的性格
+    local tomorrow = s.currentDay + 1
+    local personality = GameLogic.GetDayPersonality(tomorrow)
     local answers = GameData.IntelAnswers[personality]
     if not answers then return nil, "无法获取情报" end
     local question
@@ -771,10 +814,12 @@ function GameLogic.AskIntel(questionId)
         answer = answer.text,
         tag = answer.tag,
         personality = personality,
+        forDay = tomorrow,
         day = s.currentDay,
     }
     s.intelUsedToday = true
-    print(string.format("[Intel] 性格=%s 问题=%s 情报=%s", personality, questionId, answer.tag))
+    print(string.format("[Intel] 明日(%d)性格=%s 问题=%s 情报=%s",
+        tomorrow, personality, questionId, answer.tag))
     return s.intel
 end
 
@@ -786,6 +831,75 @@ end
 --- 获取性格信息
 function GameLogic.GetPersonality(id)
     return GameData.Personalities[id or ""] or GameData.Personalities.blunt
+end
+
+-- ============================================================================
+-- 情报闭环：次日选择是否「投其所好」
+-- ============================================================================
+
+--- 判定某次选择是否符合已知性格偏好。返回 bonus 表或 nil。
+--- kind: "place"(餐厅) / "drink"(酒) / "dish"(菜)
+---@param kind string
+---@param item table
+---@return table|nil
+function GameLogic.CheckIntelMatch(kind, item)
+    local s = GameLogic.State
+    local intel = s.intel
+    if not intel then return nil end
+    -- 情报只对「所指向的那一天」有效，过期作废
+    if intel.forDay and intel.forDay ~= s.currentDay then return nil end
+    local p = GameLogic.GetPersonality(intel.personality)
+    if not p then return nil end
+    local pref, actual
+    if kind == "place" then
+        pref = p.tierPref
+        -- Tier 1-2 视为 low，3-4 视为 high
+        actual = (item.tier and item.tier >= 3) and "high" or "low"
+    elseif kind == "drink" then
+        pref = p.pricePref
+        -- 酒价 300 以上视为 high
+        actual = (item.price and item.price >= 300) and "high" or "low"
+    elseif kind == "dish" then
+        pref = p.dishPref
+        -- 菜价 300 以上视为 high
+        actual = (item.price and item.price >= 300) and "high" or "low"
+    end
+    if not pref or not actual then return nil end
+    -- "any" 偏好：怎么选都对
+    if pref == "any" then
+        return { matched = true, kind = kind, personality = p.id,
+            effects = GameData.IntelBonus.match, desc = GameData.IntelBonus.match.desc }
+    end
+    if pref == actual then
+        return { matched = true, kind = kind, personality = p.id,
+            effects = GameData.IntelBonus.match, desc = GameData.IntelBonus.match.desc }
+    else
+        return { matched = false, kind = kind, personality = p.id,
+            effects = GameData.IntelBonus.mismatch, desc = GameData.IntelBonus.mismatch.desc }
+    end
+end
+
+--- 应用情报加成到当前属性，返回描述文案
+---@param kind string
+---@param item table
+---@return string
+function GameLogic.ApplyIntelMatch(kind, item)
+    local s = GameLogic.State
+    local result = GameLogic.CheckIntelMatch(kind, item)
+    if not result then return "" end
+    local e = result.effects or {}
+    if e.favor then s.favor = math.max(0, math.min(100, s.favor + e.favor)) end
+    if e.vibe then s.vibe = math.max(0, math.min(100, s.vibe + e.vibe)) end
+    if e.face then s.face = s.face + e.face end
+    local sign = e.favor and e.favor > 0 and "+" or ""
+    print(string.format("[IntelBonus] %s %s favor%+d vibe%+d",
+        kind, result.matched and "投其所好" or "没踩在点上",
+        e.favor or 0, e.vibe or 0))
+    if result.matched then
+        return string.format("情报生效 · %s（好感%+d 氛围%+d）", result.desc, e.favor or 0, e.vibe or 0)
+    else
+        return string.format("情报失准 · %s（好感%+d）", result.desc, e.favor or 0)
+    end
 end
 
 -- ============================================================================
