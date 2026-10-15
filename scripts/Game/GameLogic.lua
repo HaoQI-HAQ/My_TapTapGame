@@ -44,6 +44,9 @@ GameLogic.State = {
     liarTotalWins = 0,       -- 大话骰总胜场
     challengerDefeated = false, -- 是否击败过乱入挑战者
     challengerReward = nil,  ---@type table|nil 击败奖励记录
+    -- 乱入判定：每局只掷一次，避免随天数累积导致触发率失控
+    challengerRolled = false,   -- 本局是否已掷过乱入骰
+    challengerWillInvade = false, -- 本局是否会乱入（掷骰结果）
     -- 跨局峰值：favor/dignity/pro 每场重置，判定隐藏线须用整局最高值
     peakDignity = 0,
     peakFavor = 0,
@@ -150,6 +153,8 @@ function GameLogic.Reset()
     s.liarTotalWins = 0
     s.challengerDefeated = false
     s.challengerReward = nil
+    s.challengerRolled = false
+    s.challengerWillInvade = false
     s.peakDignity = 0
     s.peakFavor = 0
     s.peakPro = 0
@@ -395,26 +400,26 @@ function GameLogic.GetAvailableRestaurants()
     return results
 end
 
---- 判定普老板是否乱入（街机式隐藏挑战者，见策划案 §4.3）。
+--- 判定普老板是否乱入（街机式隐藏挑战者，见策划案 §4.6）。
 --- 不是必经 Boss：默认不出现，只有玩家表现「过于扎眼」时才乱入。
+--- 阈值按 maxDays 缩放：区域老板只有 2 天，若沿用 5 天阈值则多数条件物理不可达。
 --- 返回 triggered, reasonId。
 ---@return boolean, string
 function GameLogic.CheckHiddenBossTrigger()
     local s = GameLogic.State
-    local relaxed = s.character and s.character.isRegionalBoss
+    -- 2 天局（区域老板）用一半阈值，保证条件可达
+    local short = s.maxDays <= 2
 
-    -- C1 骰神附体：大话骰连胜 3 天（区域老板 2 天）—— 太顺了，有人想试试你
-    local streakNeed = relaxed and 2 or 3
-    if s.liarWinStreak >= streakNeed then
+    -- C1 骰神附体：大话骰连胜（5天局3天 / 2天局2天）—— 太顺了，有人想试试你
+    if s.liarWinStreak >= (short and 2 or 3) then
         return true, "C1"
     end
     -- C2 廉酒识人：二锅头≥2 且 尊严峰值≥70 —— 有性格，引起注意
     if s.cheapWineCount >= 2 and s.peakDignity >= 70 then
         return true, "C2"
     end
-    -- C3 硬骨头：硬刚选项≥4（区域老板≥2）—— 不给面子，反而被记住
-    local hardlineNeed = relaxed and 2 or 4
-    if s.hardlineCount >= hardlineNeed then
+    -- C3 硬骨头：硬刚选项≥4（2天局≥2）—— 不给面子，反而被记住
+    if s.hardlineCount >= (short and 2 or 4) then
         return true, "C3"
     end
     -- C4 情商太低：尊严极高 + 好感极低 —— 得罪人得罪到出名
@@ -422,8 +427,7 @@ function GameLogic.CheckHiddenBossTrigger()
         return true, "C4"
     end
     -- C5 情商太高：专业峰值≥40 且 好感峰值≥85 —— 太会做人，反而可疑
-    local proNeed = relaxed and 20 or 40
-    if s.peakPro >= proNeed and s.peakFavor >= 85 then
+    if s.peakPro >= (short and 20 or 40) and s.peakFavor >= 85 then
         return true, "C5"
     end
     -- C6 醉后真言：醉酒时说了真话 —— 她听见了
@@ -448,24 +452,35 @@ function GameLogic.RecordLiarOutcome(winner)
 end
 
 --- 普通对手依据餐厅而非职级；普老板为街机式乱入挑战者。
---- 乱入时机：非首日，且满足乱入条件时，按概率替换当日对手。
+--- 乱入机制：第2天起每天检查条件，条件首次满足时掷一次骰决定本局是否乱入（35%）。
+--- 掷骰只做一次，避免「每天重判」导致触发率随天数累积失控。
 function GameLogic.SelectOpponent()
     local s = GameLogic.State
     if not s.restaurant then return nil end
     local opponent = nil
 
-    -- 街机乱入判定：非首日、未击败过、满足条件时按概率乱入
-    local canInvade = s.currentDay >= 2 and not s.challengerDefeated
-    if canInvade then
+    -- 街机乱入：条件满足时掷一次骰（本局仅一次）
+    if not s.challengerRolled and not s.challengerDefeated and s.currentDay >= 2 then
         local triggered, reason = GameLogic.CheckHiddenBossTrigger()
-        -- 条件越强，乱入概率越高；基础 45%
-        local chance = triggered and 0.45 or 0
-        if triggered and math.random() < chance then
-            opponent = GameData.HiddenBosses[1]
-            s.hiddenBossTriggered = true
-            s.hiddenTriggerReason = reason
-            print(string.format("[Challenger] 普老板乱入！第%d天 触发条件=%s", s.currentDay, reason))
+        if triggered then
+            s.challengerRolled = true
+            -- 每局固定 35%，不随天数累积
+            if math.random() < 0.35 then
+                s.challengerWillInvade = true
+                s.hiddenTriggerReason = reason
+                print(string.format("[Challenger] 本局已决定乱入，触发条件=%s", reason))
+            else
+                print("[Challenger] 条件已满足但未通过概率判定（35%），本局不再乱入")
+            end
         end
+    end
+
+    -- 本局已决定乱入
+    if s.challengerWillInvade and not s.challengerDefeated then
+        opponent = GameData.HiddenBosses[1]
+        s.hiddenBossTriggered = true
+        print(string.format("[Challenger] 普老板乱入！第%d天 触发条件=%s",
+            s.currentDay, s.hiddenTriggerReason))
     end
 
     -- 未乱入：按餐厅 Tier 选常规对手
@@ -477,7 +492,6 @@ function GameLogic.SelectOpponent()
             end
         end
         s.hiddenBossTriggered = false
-        s.hiddenTriggerReason = ""
     end
 
     -- 使用副本：最终回合切立绘不能污染静态数据或下一场。
