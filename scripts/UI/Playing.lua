@@ -25,6 +25,44 @@ local function PlaySound(landing)
     if source and sound then source:Play(sound, sound:GetFrequency(), landing and 0.75 or 0.6) end
 end
 
+-- ============================================================================
+-- 普老板资源按需加载
+-- 隐藏角色默认不在预下载组（resources.json 的 hidden 组），未解锁时零内存占用。
+-- 仅在确实遭遇普老板时（hiddenBossTriggered）才拉取她的立绘与表情。
+-- ============================================================================
+local hiddenBossReady = false
+local function EnsureHiddenBossAssets(onReady)
+    if hiddenBossReady then
+        if onReady then onReady() end
+        return
+    end
+    local paths = {}
+    local npc = A.npc.pu_rui_si or {}
+    paths[#paths + 1] = npc.normal
+    paths[#paths + 1] = npc.final
+    paths[#paths + 1] = npc.legacy
+    for _, p in pairs(A.bossExpressions or {}) do paths[#paths + 1] = p end
+    -- 过滤空值，去重
+    local seen, refs = {}, {}
+    for _, p in ipairs(paths) do
+        if p and not seen[p] then
+            seen[p] = true
+            refs[#refs + 1] = p
+        end
+    end
+    if #refs == 0 then
+        hiddenBossReady = true
+        if onReady then onReady() end
+        return
+    end
+    print(string.format("[Hidden] 按需加载普老板资源 %d 项", #refs))
+    cache:DownloadResources(refs, function(success)
+        hiddenBossReady = success
+        print(string.format("[Hidden] 普老板资源就绪=%s", tostring(success)))
+        if onReady then onReady() end
+    end)
+end
+
 function Playing.Create(navigate)
     local s = GameLogic.State --[[@as table]]
     local playerRoll, opponentRoll = GameLogic.RollDice()
@@ -38,6 +76,10 @@ function Playing.Create(navigate)
         return empty
     end
     local roundToken, eventToken = s.round, event.id
+    -- 隐藏 Boss 惰性加载：仅真正遭遇普老板时才拉取她的立绘资源。
+    if s.opponent and s.opponent.isBoss then
+        EnsureHiddenBossAssets()
+    end
     local opponentName, opponentPath = Art.Opponent(s)
     local character = s.character or {}
     local restaurant = s.restaurant or {}

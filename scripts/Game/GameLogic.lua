@@ -38,6 +38,10 @@ GameLogic.State = {
     quitTalkUsed = false,    -- 醉酒选过"想辞职很久了" (C5)
     hiddenBossTriggered = false, -- 本局是否已触发普老板
     hiddenTriggerReason = "",    -- 触发原因（用于登场文案变体）
+    -- 跨局峰值：favor/dignity/pro 每场重置，判定隐藏线须用整局最高值
+    peakDignity = 0,
+    peakFavor = 0,
+    peakPro = 0,
 
     -- 职级系统
     currentLevel = 1,       -- 当前职级 Lv.1~8
@@ -116,6 +120,9 @@ function GameLogic.Reset()
     s.quitTalkUsed = false
     s.hiddenBossTriggered = false
     s.hiddenTriggerReason = ""
+    s.peakDignity = 0
+    s.peakFavor = 0
+    s.peakPro = 0
     s.budgetFailure = false
     s.currentLevel = 1
     s.startLevel = 1
@@ -339,12 +346,13 @@ end
 
 --- 判定普老板隐藏线是否触发（策划案 §4.3）。返回 triggered, reasonId。
 --- 区域老板本就身处高位，条件放宽：硬刚/专业门槛减半。
+--- 注意：favor/dignity/pro 每场重置，故用整局峰值 peak* 判定。
 function GameLogic.CheckHiddenBossTrigger()
     local s = GameLogic.State
     local relaxed = s.character and s.character.isRegionalBoss
 
-    -- C1 廉酒识人：二锅头≥2 且 尊严≥70
-    if s.cheapWineCount >= 2 and s.dignity >= 70 then
+    -- C1 廉酒识人：二锅头≥2 且 尊严峰值≥70
+    if s.cheapWineCount >= 2 and s.peakDignity >= 70 then
         return true, "C1"
     end
     -- C2 硬骨头：硬刚选项≥4（区域老板≥2）
@@ -352,14 +360,14 @@ function GameLogic.CheckHiddenBossTrigger()
     if s.hardlineCount >= hardlineNeed then
         return true, "C2"
     end
-    -- C3 猎头传闻：专业≥40 且 好感≥80
+    -- C3 猎头传闻：专业峰值≥40 且 好感峰值≥80
     local proNeed = relaxed and 20 or 40
-    if s.pro >= proNeed and s.favor >= 80 then
+    if s.peakPro >= proNeed and s.peakFavor >= 80 then
         return true, "C3"
     end
-    -- C4 反向收购：路边摊/大排档 + 尊严≥80 + 职级≥7
+    -- C4 反向收购：路边摊/大排档 + 尊严峰值≥80 + 职级≥7
     local lowTierScene = s.restaurant and (s.restaurant.id == "bbq" or s.restaurant.id == "dapaidang")
-    if lowTierScene and s.dignity >= 80 and s.currentLevel >= 7 then
+    if lowTierScene and s.peakDignity >= 80 and s.currentLevel >= 7 then
         return true, "C4"
     end
     -- C5 醉后真言
@@ -772,6 +780,11 @@ function GameLogic.MakeChoice(choiceIndex, eventId, round)
         s.quitTalkUsed = true
         print("[Hidden] 记录醉后真言（想辞职）")
     end
+
+    -- 记录跨局峰值（favor/dignity/pro 每场重置，隐藏线判定须用整局最高值）
+    s.peakDignity = math.max(s.peakDignity, s.dignity)
+    s.peakFavor = math.max(s.peakFavor, s.favor)
+    s.peakPro = math.max(s.peakPro, s.pro)
 
     if s.opponent and s.opponent.isBoss and event.type == "final" then
         s.bossFinalAnswered = true

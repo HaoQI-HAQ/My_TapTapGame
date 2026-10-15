@@ -7,7 +7,11 @@
 
   "groups": {
     "default": [
-      "**"
+      "**",
+      "!**/pu_rui_si_*"
+    ],
+    "hidden": [
+      "**/pu_rui_si_*"
     ]
   }
 }
