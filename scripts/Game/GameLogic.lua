@@ -38,6 +38,12 @@ GameLogic.State = {
     quitTalkUsed = false,    -- 醉酒选过"想辞职很久了" (C5)
     hiddenBossTriggered = false, -- 本局是否已触发普老板
     hiddenTriggerReason = "",    -- 触发原因（用于登场文案变体）
+    -- 街机乱入挑战者（普老板）相关
+    liarWinStreak = 0,       -- 大话骰连胜天数
+    liarMaxStreak = 0,       -- 最高连胜
+    liarTotalWins = 0,       -- 大话骰总胜场
+    challengerDefeated = false, -- 是否击败过乱入挑战者
+    challengerReward = nil,  ---@type table|nil 击败奖励记录
     -- 跨局峰值：favor/dignity/pro 每场重置，判定隐藏线须用整局最高值
     peakDignity = 0,
     peakFavor = 0,
@@ -139,6 +145,11 @@ function GameLogic.Reset()
     s.quitTalkUsed = false
     s.hiddenBossTriggered = false
     s.hiddenTriggerReason = ""
+    s.liarWinStreak = 0
+    s.liarMaxStreak = 0
+    s.liarTotalWins = 0
+    s.challengerDefeated = false
+    s.challengerReward = nil
     s.peakDignity = 0
     s.peakFavor = 0
     s.peakPro = 0
@@ -384,58 +395,80 @@ function GameLogic.GetAvailableRestaurants()
     return results
 end
 
---- 判定普老板隐藏线是否触发（策划案 §4.3）。返回 triggered, reasonId。
---- 区域老板本就身处高位，条件放宽：硬刚/专业门槛减半。
---- 注意：favor/dignity/pro 每场重置，故用整局峰值 peak* 判定。
+--- 判定普老板是否乱入（街机式隐藏挑战者，见策划案 §4.3）。
+--- 不是必经 Boss：默认不出现，只有玩家表现「过于扎眼」时才乱入。
+--- 返回 triggered, reasonId。
+---@return boolean, string
 function GameLogic.CheckHiddenBossTrigger()
     local s = GameLogic.State
     local relaxed = s.character and s.character.isRegionalBoss
 
-    -- C1 廉酒识人：二锅头≥2 且 尊严峰值≥70
-    if s.cheapWineCount >= 2 and s.peakDignity >= 70 then
+    -- C1 骰神附体：大话骰连胜 3 天（区域老板 2 天）—— 太顺了，有人想试试你
+    local streakNeed = relaxed and 2 or 3
+    if s.liarWinStreak >= streakNeed then
         return true, "C1"
     end
-    -- C2 硬骨头：硬刚选项≥4（区域老板≥2）
-    local hardlineNeed = relaxed and 2 or 4
-    if s.hardlineCount >= hardlineNeed then
+    -- C2 廉酒识人：二锅头≥2 且 尊严峰值≥70 —— 有性格，引起注意
+    if s.cheapWineCount >= 2 and s.peakDignity >= 70 then
         return true, "C2"
     end
-    -- C3 猎头传闻：专业峰值≥40 且 好感峰值≥80
-    local proNeed = relaxed and 20 or 40
-    if s.peakPro >= proNeed and s.peakFavor >= 80 then
+    -- C3 硬骨头：硬刚选项≥4（区域老板≥2）—— 不给面子，反而被记住
+    local hardlineNeed = relaxed and 2 or 4
+    if s.hardlineCount >= hardlineNeed then
         return true, "C3"
     end
-    -- C4 反向收购：路边摊/大排档 + 尊严峰值≥80 + 职级≥7
-    local lowTierScene = s.restaurant and (s.restaurant.id == "bbq" or s.restaurant.id == "dapaidang")
-    if lowTierScene and s.peakDignity >= 80 and s.currentLevel >= 7 then
+    -- C4 情商太低：尊严极高 + 好感极低 —— 得罪人得罪到出名
+    if s.peakDignity >= 85 and s.peakFavor <= 25 then
         return true, "C4"
     end
-    -- C5 醉后真言
-    if s.quitTalkUsed then
+    -- C5 情商太高：专业峰值≥40 且 好感峰值≥85 —— 太会做人，反而可疑
+    local proNeed = relaxed and 20 or 40
+    if s.peakPro >= proNeed and s.peakFavor >= 85 then
         return true, "C5"
+    end
+    -- C6 醉后真言：醉酒时说了真话 —— 她听见了
+    if s.quitTalkUsed then
+        return true, "C6"
     end
 
     return false, ""
 end
 
---- 普通对手依据餐厅而非职级；最终日仅当满足隐藏条件时遭遇普老板。
+--- 每场酒局后更新连胜/总胜场（在 LiarFinish 之后调用）
+---@param winner string
+function GameLogic.RecordLiarOutcome(winner)
+    local s = GameLogic.State
+    if winner == "player" then
+        s.liarWinStreak = s.liarWinStreak + 1
+        s.liarTotalWins = s.liarTotalWins + 1
+        s.liarMaxStreak = math.max(s.liarMaxStreak, s.liarWinStreak)
+    else
+        s.liarWinStreak = 0
+    end
+end
+
+--- 普通对手依据餐厅而非职级；普老板为街机式乱入挑战者。
+--- 乱入时机：非首日，且满足乱入条件时，按概率替换当日对手。
 function GameLogic.SelectOpponent()
     local s = GameLogic.State
     if not s.restaurant then return nil end
     local opponent = nil
 
-    -- 最终日：判定是否触发普老板隐藏线
-    if s.currentDay == s.maxDays then
+    -- 街机乱入判定：非首日、未击败过、满足条件时按概率乱入
+    local canInvade = s.currentDay >= 2 and not s.challengerDefeated
+    if canInvade then
         local triggered, reason = GameLogic.CheckHiddenBossTrigger()
-        if triggered then
+        -- 条件越强，乱入概率越高；基础 45%
+        local chance = triggered and 0.45 or 0
+        if triggered and math.random() < chance then
             opponent = GameData.HiddenBosses[1]
             s.hiddenBossTriggered = true
             s.hiddenTriggerReason = reason
-            print(string.format("[Hidden] 普老板现身！触发条件=%s", reason))
+            print(string.format("[Challenger] 普老板乱入！第%d天 触发条件=%s", s.currentDay, reason))
         end
     end
 
-    -- 未触发（或非最终日）：按餐厅 Tier 选常规对手
+    -- 未乱入：按餐厅 Tier 选常规对手
     if not opponent then
         for _, npc in ipairs(GameData.Opponents) do
             if s.restaurant.tier >= npc.minTier and s.restaurant.tier <= npc.maxTier then
@@ -755,6 +788,8 @@ function GameLogic.LiarFinish()
         s.favor = math.max(0, s.favor - 3)
         print("[Liar] 玩家失去话语权，好感-3")
     end
+    -- 连胜统计：影响普老板乱入条件 C1
+    GameLogic.RecordLiarOutcome(winner)
     return winner
 end
 
@@ -1141,10 +1176,7 @@ function GameLogic.GetBanquetResult()
     if s.budgetFailure or s.sober <= 0 then return "optimized" end
     local score = GameLogic.GetBanquetScore()
     if score >= GameLogic.GetPromotionThreshold() then
-        -- 仅当遭遇普老板时，必须完成终局且回答获认可；常规摊牌无此约束。
-        if s.opponent and s.opponent.isBoss and (not s.bossFinalAnswered or not s.bossApproved) then
-            return "maintain"
-        end
+        -- 遭遇乱入挑战者时，须通过其终局问答才算「击败」；但不影响升职判定。
         return "promote"
     elseif score >= 35 then
         return "maintain"
@@ -1209,8 +1241,25 @@ function GameLogic.ApplyBanquetResult(result, banquetId)
         s.money = math.max(s.money, newLevelData.money)
     end
     s.banquetCount = s.banquetCount + 1
-    s.bossDefeated = s.opponent ~= nil and s.opponent.isBoss == true
+    -- 击败乱入挑战者：给额外奖励，但不作为通关门槛
+    local beatChallenger = s.opponent ~= nil and s.opponent.isBoss == true
         and s.bossFinalAnswered and s.bossApproved and result == "promote" and s.sober > 0
+    s.bossDefeated = beatChallenger
+    if beatChallenger and not s.challengerDefeated then
+        s.challengerDefeated = true
+        -- 奖励：职级 +1（额外晋升）、好感与面子大幅提升
+        local rewardLevelBefore = s.currentLevel
+        s.currentLevel = math.min(8, s.currentLevel + 1)
+        s.favor = math.min(100, s.favor + 10)
+        s.face = s.face + 20
+        s.money = s.money + 5000
+        s.challengerReward = {
+            levelBefore = rewardLevelBefore, levelAfter = s.currentLevel,
+            favor = 10, face = 20, money = 5000,
+        }
+        print(string.format("[Challenger] 击败普老板！额外晋升 Lv.%d→Lv.%d，好感+10 面子+20 金钱+5000",
+            rewardLevelBefore, s.currentLevel))
+    end
 
     local record = {
         banquetId = id, day = s.currentDay, result = result,
@@ -1218,6 +1267,9 @@ function GameLogic.ApplyBanquetResult(result, banquetId)
         score = score, promotionThreshold = promotionThreshold, promotionSteps = s.currentLevel - levelBefore,
         promotionReason = promotionSteps > 1 and GameData.PromotionRules.description or "",
         opponentId = s.opponent and s.opponent.id or "",
+        challenger = s.opponent ~= nil and s.opponent.isBoss == true,
+        challengerDefeated = beatChallenger,
+        challengerReward = s.challengerReward,
         bossCompleted = s.bossCompleted, bossDefeated = s.bossDefeated,
         budgetFailure = s.budgetFailure,
     }
@@ -1249,22 +1301,15 @@ function GameLogic.AdvanceDay()
         return true
     end
 
-    -- 区域老板Day1到Lv.8仍继续Day2；普通角色必须完成最终日。
-    -- 通关双路径：触发普老板隐藏线须击败她；未触发则升职且达Lv.8即可。
+    -- 区域老板Day1到Lv.8仍继续Day2。
+    -- 通关条件：最终日结算为升职且达到 Lv.8。普老板是乱入挑战者，非通关门槛。
     local regional = s.character and s.character.isRegionalBoss
     local finalDay = s.currentDay == s.maxDays
     if regional then
         finalDay = finalDay and s.currentDay == 2
     end
-    local encounteredBoss = settled ~= nil and settled.opponentId == "pu_rui_si"
-    local canWin = false
-    if finalDay and s.currentLevel >= 8 and settled ~= nil then
-        if encounteredBoss then
-            canWin = settled.bossDefeated == true
-        else
-            canWin = settled.result == "promote"
-        end
-    end
+    local canWin = finalDay and s.currentLevel >= 8
+        and settled ~= nil and settled.result == "promote"
     if canWin then
         s.gameOverType = "win"
         s.phase = "game_over"
