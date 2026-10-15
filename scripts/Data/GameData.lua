@@ -240,10 +240,14 @@ GameData.Dishes = {
 }
 
 -- 普通对手由所选餐厅Tier决定：T1同事、T2领导、T3-4客户。
+-- personality 决定大话骰情报内容与 AI 行为倾向。
 GameData.Opponents = {
-    { id = "colleague", name = "同事", minTier = 1, maxTier = 1, portrait = "image/Art/NPC/colleague_normal.png" },
-    { id = "leader", name = "直属领导", minTier = 2, maxTier = 2, portrait = "image/Art/NPC/leader_normal.png" },
-    { id = "client", name = "客户", minTier = 3, maxTier = 4, portrait = "image/Art/NPC/client_normal.png" },
+    { id = "colleague", name = "同事", minTier = 1, maxTier = 1, personality = "blunt",
+      portrait = "image/Art/NPC/colleague_normal.png" },
+    { id = "leader", name = "直属领导", minTier = 2, maxTier = 2, personality = "vain",
+      portrait = "image/Art/NPC/leader_normal.png" },
+    { id = "client", name = "客户", minTier = 3, maxTier = 4, personality = "shrewd",
+      portrait = "image/Art/NPC/client_normal.png" },
 }
 
 -- 综合评分权重不变；低职级考核不要求买昂贵排面，按Lv分段公开门槛。
@@ -436,18 +440,20 @@ GameData.DialogEvents = {
 GameData.HiddenBosses = {
     {
         id = "pu_rui_si", name = "普老板·普瑞斯", displayName = "普老板", icon = "👔",
+        -- 隐藏角色资源统一放在 Art/Hidden/ 目录（resources.json 的 hidden 组，不预下载）
         background = "image/Art/Backgrounds/bg_yacht.png", -- 兼容字段；当前场景仍使用所选餐厅背景
-        portrait = "image/Art/NPC/pu_rui_si_normal.png",
-        illustration = "image/Art/Characters/pu_rui_si_body.png",
-        finalPortrait = "image/Art/NPC/pu_rui_si_final.png",
+        portrait = "image/Art/Hidden/pu_rui_si_normal.png",
+        illustration = "image/Art/Hidden/pu_rui_si_body.png",
+        finalPortrait = "image/Art/Hidden/pu_rui_si_final.png",
         portraits = {
-            normal = "image/Art/NPC/pu_rui_si_normal.png",
-            smile = "image/Art/Characters/pu_rui_si_smile.png",
-            skeptical = "image/Art/Characters/pu_rui_si_skeptical.png",
-            drunk = "image/Art/Characters/pu_rui_si_drunk.png",
-            final = "image/Art/NPC/pu_rui_si_final.png",
+            normal = "image/Art/Hidden/pu_rui_si_normal.png",
+            smile = "image/Art/Hidden/pu_rui_si_smile.png",
+            skeptical = "image/Art/Hidden/pu_rui_si_skeptical.png",
+            drunk = "image/Art/Hidden/pu_rui_si_drunk.png",
+            final = "image/Art/Hidden/pu_rui_si_final.png",
         },
         isBoss = true,
+        personality = "shrewd",
         desc = "普瑞斯，称普老板；隐藏最终Boss，须满足隐藏触发条件才在最终日现身",
     },
 }
@@ -469,6 +475,83 @@ GameData.HiddenBossIntro = {
     "\"普、普老板……您怎么亲自来了？\"",
     "她没看任何人，只把目光落在你身上：",
     "\"听说今天这桌，有个有意思的人。\"",
+}
+
+--- 收集所有隐藏 Boss 的图片资源路径（去重）。
+--- 供 UI 层按需下载使用：隐藏角色不预下载，未解锁零内存占用。
+--- 新增隐藏 Boss 时只需在 HiddenBosses 中补齐字段，此处自动覆盖。
+---@return string[] paths
+function GameData.CollectHiddenBossAssets()
+    local seen, result = {}, {}
+    local function add(path)
+        if type(path) == "string" and path ~= "" and not seen[path] then
+            seen[path] = true
+            result[#result + 1] = path
+        end
+    end
+    for _, boss in ipairs(GameData.HiddenBosses) do
+        add(boss.portrait)
+        add(boss.illustration)
+        add(boss.finalPortrait)
+        add(boss.background)
+        if boss.portraits then
+            for _, p in pairs(boss.portraits) do add(p) end
+        end
+    end
+    return result
+end
+
+-- ============================================================================
+-- 大话骰（简化版）：双方各 1 颗骰，隐藏对方点数，轮流加码或叫开
+-- ============================================================================
+GameData.LiarsDice = {
+    dicePerSide = 1,
+    aiBluffChance = 0.35,        -- 明知不够也硬加码的概率（虚张声势）
+    aiChallengeChance = 0.55,    -- 估算命中率不足时叫开的概率
+}
+
+-- 性格标签：决定情报内容与对手行为倾向
+GameData.Personalities = {
+    vain   = { id = "vain",   name = "爱慕虚荣", hint = "排面至上，越贵越有面子" },
+    humble = { id = "humble", name = "谦虚务实", hint = "看重实在，铺张反而扣分" },
+    blunt  = { id = "blunt",  name = "直爽豪迈", hint = "喜欢直来直去，讨厌客套" },
+    shrewd = { id = "shrewd", name = "精明算计", hint = "性价比优先，会算账" },
+}
+
+-- 情报问题：玩家赢得话语权后可问，每场最多问 1 个
+GameData.IntelQuestions = {
+    { id = "drink",  text = "今晚想喝点什么？",       category = "drink" },
+    { id = "dish",   text = "有什么忌口或偏爱？",     category = "dish" },
+    { id = "place",  text = "平时喜欢去哪儿吃？",     category = "place" },
+    { id = "person", text = "您是个什么样的人？",     category = "person" },
+}
+
+-- 情报答案：按性格 × 类别，给出隐晦片面的信息
+GameData.IntelAnswers = {
+    vain = {
+        drink = { text = "\"酒嘛，得看牌子。便宜的拿不出手。\"", tag = "偏好高价酒" },
+        dish  = { text = "\"菜要够档次，摆盘也得讲究。\"",       tag = "偏好高价菜" },
+        place = { text = "\"环境最重要，路边摊就算了。\"",       tag = "偏好高 Tier 餐厅" },
+        person= { text = "\"场面上的事，不能含糊。\"",           tag = "爱慕虚荣" },
+    },
+    humble = {
+        drink = { text = "\"喝什么都行，别整那些虚的。\"",       tag = "不在意酒价" },
+        dish  = { text = "\"家常菜就挺好，别浪费。\"",           tag = "偏好实在菜" },
+        place = { text = "\"人多热闹的地方就行。\"",             tag = "偏好低 Tier 餐厅" },
+        person= { text = "\"我这人不讲究那些排场。\"",           tag = "谦虚务实" },
+    },
+    blunt = {
+        drink = { text = "\"能喝的酒就是好酒。\"",               tag = "偏好高度酒" },
+        dish  = { text = "\"来点硬菜，别上那些花里胡哨的。\"",   tag = "偏好硬菜" },
+        place = { text = "\"哪都能喝，主要是跟谁喝。\"",         tag = "不在意餐厅" },
+        person= { text = "\"我这人说话直，你别介意。\"",         tag = "直爽豪迈" },
+    },
+    shrewd = {
+        drink = { text = "\"酒水利润高，懂行的不会乱点。\"",     tag = "在意性价比" },
+        dish  = { text = "\"点菜要看时令，反季的最贵。\"",       tag = "偏好时令菜" },
+        place = { text = "\"同样的菜，换个地方贵三倍。\"",       tag = "偏好性价比餐厅" },
+        person= { text = "\"钱要花在刀刃上。\"",                 tag = "精明算计" },
+    },
 }
 
 -- 普老板专属考核，按回合顺序轮换，不参与普通随机事件池。

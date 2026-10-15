@@ -28,12 +28,12 @@ Art.Assets = {
         leader = {normal = "image/Art/NPC/leader_normal.png", legacy = "image/v2_npc_leader_normal_20261014125559.png"},
         colleague = {normal = "image/Art/NPC/colleague_normal.png"},
         client = {normal = "image/Art/NPC/client_normal.png"},
-        pu_rui_si = {normal = "image/Art/NPC/pu_rui_si_normal.png", final = "image/Art/NPC/pu_rui_si_final.png", legacy = "image/Art/Characters/pu_rui_si_body.png"},
+        pu_rui_si = {normal = "image/Art/Hidden/pu_rui_si_normal.png", final = "image/Art/Hidden/pu_rui_si_final.png", legacy = "image/Art/Hidden/pu_rui_si_body.png"},
     },
     bossExpressions = {
-        smile = "image/Art/Characters/pu_rui_si_smile.png",
-        skeptical = "image/Art/Characters/pu_rui_si_skeptical.png",
-        drunk = "image/Art/Characters/pu_rui_si_drunk.png",
+        smile = "image/Art/Hidden/pu_rui_si_smile.png",
+        skeptical = "image/Art/Hidden/pu_rui_si_skeptical.png",
+        drunk = "image/Art/Hidden/pu_rui_si_drunk.png",
     },
     backgrounds = {
         bbq = "image/Art/Backgrounds/bg_bbq.png",

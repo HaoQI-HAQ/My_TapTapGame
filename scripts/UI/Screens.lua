@@ -238,7 +238,7 @@ function Screens.CreateDayStart()
             backgroundColor = day == s.currentDay and C.yellow or (day < s.currentDay and C.lilac or C.paper),
             borderWidth = 2, borderColor = C.ink, children = {Art.Text(tostring(day), 13)}}
     end
-    return Sheet("第 " .. s.currentDay .. " 天", "新的饭局，新的生存机会。", {
+    local body = {
         UI.Panel {flexDirection = "row", flexWrap = "wrap", gap = 8, children = progress},
         UI.Panel {flexDirection = "row", alignItems = "center", gap = 16, children = {
             Art.Picture(Art.Character(character, true), {width = 86, height = 104}),
@@ -250,8 +250,20 @@ function Screens.CreateDayStart()
         Art.StatRow("今日预算", "¥" .. s.money),
         Art.StatRow("被优化次数", s.optimizeCount .. " / " .. s.maxOptimize, s.optimizeCount > 0 and C.red or C.muted),
         Art.Text((character.skill or "专属技能") .. " / " .. (character.skillDesc or ""), 13, C.muted),
-        Art.Button("出发赴宴  →", function() GameLogic.StartDay(); Navigate(s.phase) end),
-    })
+    }
+    -- 昨日赢得话语权问到的情报，供今日选酒/选菜/选场地参考
+    local intel = GameLogic.GetIntel()
+    if intel then
+        local personality = GameLogic.GetPersonality(intel.personality)
+        body[#body + 1] = UI.Panel {width = "100%", padding = 10, gap = 4,
+            backgroundColor = C.lilac, borderWidth = 2, borderColor = C.ink, children = {
+                Art.Text("昨日情报 · " .. personality.name, 13, C.purple, {fontWeight = "bold"}),
+                Art.Text(intel.answer, 14, C.ink),
+                Art.Text("线索：" .. intel.tag, 12, C.muted),
+            }}
+    end
+    body[#body + 1] = Art.Button("出发赴宴  →", function() GameLogic.StartDay(); Navigate(s.phase) end)
+    return Sheet("第 " .. s.currentDay .. " 天", "新的饭局，新的生存机会。", body)
 end
 
 function Screens.CreateRestDay()

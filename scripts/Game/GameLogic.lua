@@ -79,6 +79,23 @@ GameLogic.State = {
     totalSpent = 0,
     firstMistakeUsed = false, -- 实习生萌新光环
 
+    -- 大话骰（每回合开局）：双方各1颗，隐藏对方点数，轮流加码或叫开
+    liar = {
+        active = false,        -- 是否处于大话骰阶段
+        playerDie = 0,         -- 玩家点数（隐藏）
+        opponentDie = 0,       -- 对手点数（玩家不可见）
+        currentBid = 0,        -- 当前叫的点数
+        turn = "player",       -- 当前行动方 "player" / "opponent"
+        revealOpponent = false,-- 是否已亮出对手点数
+        winner = nil,          -- "player" / "opponent" / nil
+        rounds = 0,            -- 加码次数，防死循环
+    },
+    -- 当日情报（赢得话语权后问得，供次日参考）
+    intel = nil,           ---@type table|nil
+    intelUsedToday = false,
+    -- 每日对手性格（次日沿用同一对手池，情报有实际价值）
+    opponentPersonality = nil, ---@type string|nil
+
     -- 历史记录
     dayHistory = {},    -- { day=1, result="promote", levelBefore=1, levelAfter=2 }
 
@@ -123,6 +140,11 @@ function GameLogic.Reset()
     s.peakDignity = 0
     s.peakFavor = 0
     s.peakPro = 0
+    s.liar = { active = false, playerDie = 0, opponentDie = 0, currentBid = 0,
+        turn = "player", revealOpponent = false, winner = nil, rounds = 0 }
+    s.intel = nil
+    s.intelUsedToday = false
+    s.opponentPersonality = nil
     s.budgetFailure = false
     s.currentLevel = 1
     s.startLevel = 1
@@ -410,7 +432,9 @@ function GameLogic.SelectOpponent()
     -- 使用副本：最终回合切立绘不能污染静态数据或下一场。
     s.opponent = SelectionItem(opponent, 0)
     s.opponent.illustration = opponent.illustration or opponent.portrait
-    print(string.format("[Opponent] day=%d tier=%d id=%s", s.currentDay, s.restaurant.tier, opponent.id))
+    s.opponentPersonality = opponent.personality or "blunt"
+    print(string.format("[Opponent] day=%d tier=%d id=%s 性格=%s",
+        s.currentDay, s.restaurant.tier, opponent.id, s.opponentPersonality))
     return s.opponent
 end
 
@@ -570,23 +594,139 @@ function GameLogic.ResetBanquetStats()
     s.bossCompleted = false
     s.bossDefeated = false
     s.budgetFailure = false
+    -- 每日情报重置（intel 本身保留，供次日参考）
+    s.intelUsedToday = false
+    s.liar = { active = false, playerDie = 0, opponentDie = 0, currentBid = 0,
+        turn = "player", revealOpponent = false, winner = nil, rounds = 0 }
     return true
 end
 
 -- ============================================================================
 -- 骰子系统
 -- ============================================================================
+-- ============================================================================
+-- 大话骰（简化版）
+-- 双方各 1 颗骰。玩家可见自己的点数，对手点数隐藏。
+-- 轮流行动：加码（叫更大点数）或叫开（要求亮骰比对）。
+-- 叫开时：若叫的点数 ≤ 实际点数（双方点数之和的最大值语义简化为对手点数），
+-- 则叫开者输；反之加码者输。这里简化为单骰比较：
+--   叫开者赢 = 当前叫的点数 > 对手实际点数（即加码者虚报）
+-- ============================================================================
+
+--- 开始一回合的大话骰
+function GameLogic.StartLiarRound()
+    local s = GameLogic.State
+    s.liar.active = true
+    s.liar.playerDie = math.random(1, 6)
+    s.liar.opponentDie = math.random(1, 6)
+    -- 面子值加成：高面子时有概率让玩家骰子更好
+    if s.face > 20 and math.random() < 0.2 then
+        s.liar.playerDie = math.min(6, s.liar.playerDie + 1)
+    end
+    s.liar.currentBid = 0
+    s.liar.turn = "player"
+    s.liar.revealOpponent = false
+    s.liar.winner = nil
+    s.liar.rounds = 0
+    print(string.format("[Liar] 开局 玩家骰=%d 对手骰=%d", s.liar.playerDie, s.liar.opponentDie))
+    return s.liar
+end
+
+--- 玩家加码：叫一个比当前更大的点数（1-6）
+function GameLogic.LiarRaise(bid)
+    local s = GameLogic.State
+    local L = s.liar
+    if not L.active or L.turn ~= "player" then return false, "现在不是你的回合" end
+    if bid <= L.currentBid or bid > 6 then return false, "只能往上加码（1-6）" end
+    L.currentBid = bid
+    L.rounds = L.rounds + 1
+    L.turn = "opponent"
+    print(string.format("[Liar] 玩家加码 → %d", bid))
+    return true
+end
+
+--- 玩家叫开：要求亮骰
+function GameLogic.LiarChallenge()
+    local s = GameLogic.State
+    local L = s.liar
+    if not L.active or L.turn ~= "player" then return false, "现在不是你的回合" end
+    -- 对手虚报（叫的点数 > 对手实际点数）→ 玩家赢
+    local opponentBluffed = L.currentBid > L.opponentDie
+    L.revealOpponent = true
+    L.winner = opponentBluffed and "player" or "opponent"
+    L.active = false
+    print(string.format("[Liar] 玩家叫开 bid=%d 对手骰=%d → %s胜",
+        L.currentBid, L.opponentDie, L.winner == "player" and "玩家" or "对手"))
+    return true, L.winner
+end
+
+--- 对手行动（AI）：加码或叫开。返回 action, bid
+function GameLogic.LiarOpponentTurn()
+    local s = GameLogic.State
+    local L = s.liar
+    if not L.active or L.turn ~= "opponent" then return nil end
+
+    local cfg = GameData.LiarsDice
+    -- 对手估算：自己点数 + 假设玩家平均值
+    local estimated = L.opponentDie + 3.5
+    -- 当前叫价已超出估算 → 倾向叫开
+    local shouldChallenge = L.currentBid >= estimated and math.random() < cfg.aiChallengeChance
+    -- 或者已经加码太多轮，避免死循环
+    if L.rounds >= 6 then shouldChallenge = true end
+
+    if shouldChallenge then
+        -- 对手叫开：判断玩家是否虚报
+        local playerBluffed = L.currentBid > L.playerDie
+        L.revealOpponent = true
+        L.winner = playerBluffed and "opponent" or "player"
+        L.active = false
+        print(string.format("[Liar] 对手叫开 bid=%d 玩家骰=%d → %s胜",
+            L.currentBid, L.playerDie, L.winner == "player" and "玩家" or "对手"))
+        return "challenge", L.currentBid
+    end
+
+    -- 加码：在合理范围内往上叫，偶尔虚张声势
+    local nextBid = L.currentBid + math.random(1, 2)
+    if nextBid > 6 then
+        -- 无法再加，只能叫开
+        local playerBluffed = L.currentBid > L.playerDie
+        L.revealOpponent = true
+        L.winner = playerBluffed and "opponent" or "player"
+        L.active = false
+        return "challenge", L.currentBid
+    end
+    L.currentBid = nextBid
+    L.rounds = L.rounds + 1
+    L.turn = "player"
+    print(string.format("[Liar] 对手加码 → %d", nextBid))
+    return "raise", nextBid
+end
+
+--- 结束大话骰，返回赢家。玩家赢 → 获得话语权（问情报）
+function GameLogic.LiarFinish()
+    local s = GameLogic.State
+    local L = s.liar
+    local winner = L.winner or "opponent"
+    -- 玩家获胜 → 给予话语权奖励
+    if winner == "player" then
+        s.favor = math.min(100, s.favor + 5)
+        print("[Liar] 玩家赢得话语权，好感+5")
+    else
+        s.favor = math.max(0, s.favor - 3)
+        print("[Liar] 玩家失去话语权，好感-3")
+    end
+    return winner
+end
+
+--- 兼容旧接口：直接返回大话骰结果（player 赢 = advantage）
 function GameLogic.RollDice()
     local s = GameLogic.State
     if s.phase ~= "playing" or s.currentEvent then return s.playerDice, s.opponentDice end
     s.playerDice = math.random(1, 6)
     s.opponentDice = math.random(1, 6)
-
-    -- 面子值加成
     if s.face > 20 and math.random() < 0.2 then
         s.playerDice = math.min(6, s.playerDice + 1)
     end
-
     return s.playerDice, s.opponentDice
 end
 
@@ -599,6 +739,53 @@ function GameLogic.GetDiceResult()
     else
         return "passive"
     end
+end
+
+-- ============================================================================
+-- 情报系统：赢得话语权后询问对手，获得隐晦信息
+-- ============================================================================
+
+--- 获取可问的问题列表（每场最多问 1 个）
+function GameLogic.GetIntelQuestions()
+    local s = GameLogic.State
+    if s.intelUsedToday then return {} end
+    return GameData.IntelQuestions
+end
+
+--- 询问情报：返回答案文本与标签
+function GameLogic.AskIntel(questionId)
+    local s = GameLogic.State
+    if s.intelUsedToday then return nil, "今天已经问过了" end
+    local personality = s.opponentPersonality or "blunt"
+    local answers = GameData.IntelAnswers[personality]
+    if not answers then return nil, "无法获取情报" end
+    local question
+    for _, q in ipairs(GameData.IntelQuestions) do
+        if q.id == questionId then question = q; break end
+    end
+    if not question then return nil, "无效的问题" end
+    local answer = answers[question.category]
+    if not answer then return nil, "对方不愿多谈" end
+    s.intel = {
+        question = question.text,
+        answer = answer.text,
+        tag = answer.tag,
+        personality = personality,
+        day = s.currentDay,
+    }
+    s.intelUsedToday = true
+    print(string.format("[Intel] 性格=%s 问题=%s 情报=%s", personality, questionId, answer.tag))
+    return s.intel
+end
+
+--- 获取当前保存的情报（供次日参考）
+function GameLogic.GetIntel()
+    return GameLogic.State.intel
+end
+
+--- 获取性格信息
+function GameLogic.GetPersonality(id)
+    return GameData.Personalities[id or ""] or GameData.Personalities.blunt
 end
 
 -- ============================================================================

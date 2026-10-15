@@ -1,6 +1,7 @@
 -- 饭局视觉小说舞台。骰子结果由 GameLogic 决定，Dice3D 只播放动画。
 local UI = require("urhox-libs/UI")
 local GameLogic = require("Game.GameLogic")
+local GameData = require("Data.GameData")
 local Dice3D = require("UI.Dice3D")
 local Art = require("UI.ArtTheme")
 local Playing = {}
@@ -26,46 +27,32 @@ local function PlaySound(landing)
 end
 
 -- ============================================================================
--- 普老板资源按需加载
+-- 隐藏角色资源按需加载
 -- 隐藏角色默认不在预下载组（resources.json 的 hidden 组），未解锁时零内存占用。
--- 仅在确实遭遇普老板时（hiddenBossTriggered）才拉取她的立绘与表情。
+-- 资源清单由 GameData.CollectHiddenBossAssets() 自动收集，新增隐藏角色无需改这里。
 -- ============================================================================
-local hiddenBossReady = false
-local function EnsureHiddenBossAssets(onReady)
-    if hiddenBossReady then
+local hiddenAssetsReady = false
+local function EnsureHiddenAssets(onReady)
+    if hiddenAssetsReady then
         if onReady then onReady() end
         return
     end
-    local paths = {}
-    local npc = A.npc.pu_rui_si or {}
-    paths[#paths + 1] = npc.normal
-    paths[#paths + 1] = npc.final
-    paths[#paths + 1] = npc.legacy
-    for _, p in pairs(A.bossExpressions or {}) do paths[#paths + 1] = p end
-    -- 过滤空值，去重
-    local seen, refs = {}, {}
-    for _, p in ipairs(paths) do
-        if p and not seen[p] then
-            seen[p] = true
-            refs[#refs + 1] = p
-        end
-    end
+    local refs = GameData.CollectHiddenBossAssets()
     if #refs == 0 then
-        hiddenBossReady = true
+        hiddenAssetsReady = true
         if onReady then onReady() end
         return
     end
-    print(string.format("[Hidden] 按需加载普老板资源 %d 项", #refs))
+    print(string.format("[Hidden] 按需加载隐藏角色资源 %d 项", #refs))
     cache:DownloadResources(refs, function(success)
-        hiddenBossReady = success
-        print(string.format("[Hidden] 普老板资源就绪=%s", tostring(success)))
+        hiddenAssetsReady = success
+        print(string.format("[Hidden] 隐藏角色资源就绪=%s", tostring(success)))
         if onReady then onReady() end
     end)
 end
 
 function Playing.Create(navigate)
     local s = GameLogic.State --[[@as table]]
-    local playerRoll, opponentRoll = GameLogic.RollDice()
     local event = GameLogic.GetNextEvent()
     if not event then
         -- 避免构建函数内递归切屏后被 main 的外层 SetRoot 覆盖。
@@ -76,16 +63,15 @@ function Playing.Create(navigate)
         return empty
     end
     local roundToken, eventToken = s.round, event.id
-    -- 隐藏 Boss 惰性加载：仅真正遭遇普老板时才拉取她的立绘资源。
+    -- 隐藏角色惰性加载：仅真正遭遇时（isBoss）才拉取其立绘资源。
     if s.opponent and s.opponent.isBoss then
-        EnsureHiddenBossAssets()
+        EnsureHiddenAssets()
     end
     local opponentName, opponentPath = Art.Opponent(s)
     local character = s.character or {}
     local restaurant = s.restaurant or {}
     local levelName = GameLogic.GetLevelData(s.currentLevel).name
     local alive, rolling, ready, chosen = true, false, false, false
-    local completed = 0
     ---@type number
     local elapsed = 0
     local shownCharacters = 0
@@ -101,21 +87,36 @@ function Playing.Create(navigate)
         width = "34%", height = "100%", backgroundFit = "contain"})
     local playerDice = Dice3D.View {styleKey = "classic", width = 105, height = 112, pointerEvents = "none"}
     local opponentDice = Dice3D.View {styleKey = "classic", width = 105, height = 112, pointerEvents = "none"}
-    local resultLabel = Art.Text("话语权，由这一掷开始。", 12, C.paper,
-        {width = "100%", textAlign = "center"})
+    opponentDice:Hide()
+    -- 对手骰子揭示前用 "?" 占位
+    local opponentHidden = UI.Panel {
+        width = 96, height = 104, backgroundColor = C.purple, borderWidth = 2, borderColor = C.ink,
+        borderRadius = 4, justifyContent = "center", alignItems = "center",
+        children = {Art.Text("?", 44, C.paper, {textAlign = "center"})},
+    }
+    local bidLabel = Art.Text("等待开局", 13, C.yellow, {width = "100%", textAlign = "center"})
     local playerResult = Art.Text("我方  ?", 11, C.yellow, {textAlign = "center"})
     local opponentResult = Art.Text("对方  ?", 11, C.paper, {textAlign = "center"})
-    local rollButton = Art.Button("摇骰子", nil, false, {width = "100%", id = "roll_dice"})
-    local rollLabel = rollButton:GetChildAt(1) --[[@as Label]]
+    local rollButton = Art.Button("开始大话骰", nil, false, {width = "100%", id = "roll_dice"})
     local diceRow = UI.Panel {flexDirection = "row", justifyContent = "center", alignItems = "center", children = {
         UI.Panel {alignItems = "center", children = {playerDice, playerResult}},
         Art.Text("VS", 13, C.yellow, {marginHorizontal = 2}),
-        UI.Panel {alignItems = "center", children = {opponentDice, opponentResult}},
+        UI.Panel {alignItems = "center", children = {opponentHidden, opponentDice, opponentResult}},
     }}
+    -- 大话骰行动区：加码（比当前叫价大的点数）+ 叫开
+    local raiseButtons = {}
+    for v = 1, 6 do
+        raiseButtons[v] = Art.Button(tostring(v), nil, true, {width = 40, minHeight = 34, paddingHorizontal = 0})
+    end
+    local challengeButton = Art.Button("叫开！", nil, false, {width = "100%", id = "liar_challenge"})
+    local raiseRow = UI.Panel {width = "100%", flexDirection = "row", justifyContent = "center",
+        gap = 4, flexWrap = "wrap", children = raiseButtons}
+    local actionPanel = UI.Panel {width = "100%", gap = 4, children = {raiseRow, challengeButton}}
+    actionPanel:Hide()
     local center = Art.Paper({
         Art.Text("ROUND " .. s.round .. " / " .. s.maxRounds, 11, C.yellow, {textAlign = "center"}),
-        diceRow, resultLabel, rollButton,
-    }, {id = "dice_stage", width = 260, padding = 10, gap = 5, alignSelf = "center"}, true)
+        diceRow, bidLabel, rollButton, actionPanel,
+    }, {id = "dice_stage", width = 280, padding = 10, gap = 5, alignSelf = "center"}, true)
     local playerTag = Art.Text(character.name or "我方", 12, C.ink, {
         position = "absolute", bottom = 5, left = 8, backgroundColor = C.yellow,
         paddingHorizontal = 8, paddingVertical = 3, width = 130, maxWidth = "40%", borderWidth = 1, borderColor = C.ink})
@@ -187,23 +188,75 @@ function Playing.Create(navigate)
         borderTopWidth = 3, borderTopColor = C.ink, children = {scroll}}
     local root = Art.Root({Art.Safe({Art.HUD(s, levelName), Art.Stats(s, true), location, stage, bottom})}, Art.Background(restaurant))
 
-    local function FinishRoll()
+    -- ========================================================================
+    -- 大话骰流程
+    -- 玩家开局 → 可见自己点数、对手隐藏 → 轮流加码/叫开 → 揭晓 → 出对话
+    -- ========================================================================
+    -- 前向声明：LiarSettle → ShowIntelQuestions → OpenDialogue 互相调用
+    local ShowIntelQuestions, OpenDialogue
+
+    local function RevealOpponentDie()
+        opponentHidden:Hide()
+        opponentDice:Show()
+        opponentDice:Roll(GameLogic.State.liar.opponentDie)
+        opponentResult:SetText("对方  " .. GameLogic.State.liar.opponentDie)
+    end
+
+    -- 大话骰结束后：玩家赢 → 获得话语权（可问情报）；输 → 直接进对话
+    local function LiarSettle(winner)
+        if winner == "player" then
+            bidLabel:SetText("你赢得话语权！可以问对方一个问题")
+            bidLabel:SetFontColor(C.yellow)
+        else
+            bidLabel:SetText("你失去了话语权 · 小心应对")
+            bidLabel:SetFontColor(C.lilac)
+        end
+        GameLogic.LiarFinish()
+        actionPanel:Hide()
+        rollButton:Hide()
+        -- 短暂停顿后进入对话（或情报问答）
+        if winner == "player" and not GameLogic.State.intelUsedToday then
+            ShowIntelQuestions()
+        else
+            OpenDialogue()
+        end
+    end
+
+    -- 情报问答：玩家赢得话语权后，从 4 个问题中选 1 个
+    local intelPanel = nil
+    ShowIntelQuestions = function()
+        local questions = GameLogic.GetIntelQuestions()
+        if #questions == 0 then
+            OpenDialogue()
+            return
+        end
+        local buttons = {}
+        for _, q in ipairs(questions) do
+            buttons[#buttons + 1] = Art.Button(q.text, function()
+                local info = GameLogic.AskIntel(q.id)
+                if info then
+                    bidLabel:SetText("情报：" .. info.tag)
+                    bidLabel:SetFontColor(C.yellow)
+                    speaker:SetText("情报 · 记下了")
+                    dialogue:SetText(info.answer .. "\n【" .. info.tag .. "】")
+                    typing = false
+                end
+                if intelPanel then intelPanel:Hide() end
+                OpenDialogue()
+            end, true, {width = "100%", minHeight = 42})
+        end
+        intelPanel = Art.Paper({
+            Art.Text("赢得话语权 · 问一个问题", 13, C.yellow, {textAlign = "center"}),
+            UI.Panel {width = "100%", gap = 4, children = buttons},
+        }, {width = 260, padding = 10, gap = 5, alignSelf = "center"}, true)
+        center:AddChild(intelPanel)
+        print("[ArtUI] 情报问答已开放")
+    end
+
+    -- 打开对话选项（原有逻辑）
+    OpenDialogue = function()
         if not alive or ready then return end
         ready = true
-        local result = GameLogic.GetDiceResult()
-        if result == "tie" then
-            resultLabel:SetText("平局 · 干杯事件触发")
-            resultLabel:SetFontColor(C.yellow)
-        elseif result == "advantage" then
-            resultLabel:SetText("本回合你占优势")
-            resultLabel:SetFontColor(C.yellow)
-        else
-            resultLabel:SetText("对方占优势 · 小心应对")
-            resultLabel:SetFontColor(C.lilac)
-        end
-        playerResult:SetText("我方  " .. playerRoll)
-        opponentResult:SetText("对方  " .. opponentRoll)
-        rollButton:Hide()
         speaker:SetText(opponentName .. " · " .. (event.type == "final" and "最后一轮" or "正在交谈"))
         dialogue:SetText("")
         elapsed, shownCharacters, typing = 0, 0, true
@@ -211,26 +264,83 @@ function Playing.Create(navigate)
         bubble:Animate({keyframes = {[0] = {opacity = 0.3, translateY = 6}, [1] = {opacity = 1, translateY = 0}},
             duration = 0.22, easing = "easeOut"})
         scroll:ScrollToTop()
-        print("[ArtUI] 双骰落定，对话选项已开放")
+        print("[ArtUI] 对话选项已开放")
     end
-    local function DiceComplete()
-        if not alive then return end
-        completed = completed + 1
-        if completed == 2 then FinishRoll() end
+
+    -- 对手回合：AI 加码或叫开
+    local function RunOpponentTurn()
+        local action, bid = GameLogic.LiarOpponentTurn()
+        if action == "raise" then
+            bidLabel:SetText("对方叫 " .. bid .. " 点 · 轮到你了")
+            bidLabel:SetFontColor(C.lilac)
+        elseif action == "challenge" then
+            RevealOpponentDie()
+            bidLabel:SetText("对方叫开！")
+            LiarSettle(GameLogic.State.liar.winner)
+        end
     end
-    playerDice.props.onLand = function() if alive then PlaySound(true) end end
-    opponentDice.props.onLand = function() if alive then PlaySound(true) end end
-    playerDice.props.onComplete = DiceComplete
-    opponentDice.props.onComplete = DiceComplete
+
+    -- 玩家加码
+    for v = 1, 6 do
+        raiseButtons[v].props.onClick = function()
+            if not alive or chosen then return end
+            local L = GameLogic.State.liar
+            if not L.active or L.turn ~= "player" then return end
+            local ok, err = GameLogic.LiarRaise(v)
+            if not ok then
+                UI.Toast.Show(tostring(err or "不能这么叫"), {variant = "warning", duration = 2})
+                return
+            end
+            bidLabel:SetText("你叫 " .. v .. " 点")
+            actionPanel:Hide()
+            -- 对手思考后行动
+            RunOpponentTurn()
+            if GameLogic.State.liar.active then
+                bidLabel:SetText("对方叫 " .. GameLogic.State.liar.currentBid .. " 点 · 轮到你了")
+                actionPanel:Show()
+                -- 只能叫比当前更大的点数
+                for i = 1, 6 do
+                    raiseButtons[i]:SetStyle({opacity = i > GameLogic.State.liar.currentBid and 1 or 0.35})
+                end
+            end
+        end
+    end
+
+    -- 玩家叫开
+    challengeButton.props.onClick = function()
+        if not alive or chosen then return end
+        local L = GameLogic.State.liar
+        if not L.active or L.turn ~= "player" then return end
+        if L.currentBid == 0 then
+            UI.Toast.Show("还没人叫点数，不能叫开", {variant = "warning", duration = 2})
+            return
+        end
+        GameLogic.LiarChallenge()
+        RevealOpponentDie()
+        bidLabel:SetText("你叫开！")
+        LiarSettle(L.winner)
+    end
+
+    -- 开始大话骰
     rollButton.props.onClick = function()
         if not alive or rolling then return end
         rolling = true
-        rollButton.props.disabled = true
-        rollLabel:SetText("翻滚中…")
-        resultLabel:SetText("骰子翻滚中…")
+        rollButton:Hide()
         PlaySound(false)
-        playerDice:Roll(playerRoll)
-        opponentDice:Roll(opponentRoll)
+        local L = GameLogic.StartLiarRound()
+        bidLabel:SetText("你的骰子已就位 · 请叫点或叫开")
+        bidLabel:SetFontColor(C.yellow)
+        playerResult:SetText("我方  " .. L.playerDie)
+        playerDice:Roll(L.playerDie)
+        -- 骰子落定后开放行动区
+        playerDice.props.onComplete = function()
+            if not alive then return end
+            PlaySound(true)
+            actionPanel:Show()
+            for i = 1, 6 do
+                raiseButtons[i]:SetStyle({opacity = 1})
+            end
+        end
     end
 
     -- 重排网格只移动已有选项，不重建骰子、不重新抽事件。
@@ -271,8 +381,8 @@ function Playing.Create(navigate)
     local destroy = root.Destroy
     root.Destroy = function(self)
         alive, typing = false, false
-        playerDice.props.onComplete, opponentDice.props.onComplete = nil, nil
-        playerDice.props.onLand, opponentDice.props.onLand = nil, nil
+        playerDice.props.onComplete = nil
+        opponentDice.props.onComplete = nil
         destroy(self)
     end
     print("[ArtUI] 饭局舞台 Day " .. s.currentDay .. " / Round " .. s.round)

@@ -8,10 +8,10 @@
   "groups": {
     "default": [
       "**",
-      "!**/pu_rui_si_*"
+      "!**/Art/Hidden/**"
     ],
     "hidden": [
-      "**/pu_rui_si_*"
+      "**/Art/Hidden/**"
     ]
   }
 }
