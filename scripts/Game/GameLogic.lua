@@ -102,7 +102,12 @@ GameLogic.State = {
         winner = nil,          -- "player" / "opponent" / nil
         rerolls = 0,           -- 重摇次数
         rerollInfo = nil,      -- 上次重摇的快照（reason/dice/choices），供 UI 解释
+        drunkOut = false,      -- 本回合是否已醉倒（无法行动，直接判负）
     },
+    -- 喝醉状态：连续叫开失利达阈值 → 下一轮醉倒无法行动。
+    -- 计数跨回合累计（不随 guess 表重置），每天开局清零。
+    drunkStreak = 0,       -- 当前连续叫开失利次数
+    drunk = false,         -- 当前是否处于喝醉状态（下一轮无法行动）
     -- 当日情报（赢得话语权后问得，供次日参考）
     intel = nil,           ---@type table|nil
     intelUsedToday = false,
@@ -180,7 +185,9 @@ function GameLogic.Reset()
     s.specialEvents = {}
     s.guess = { active = false, playerDie = 0, opponentDie = 0, opponentChoice = nil,
         playerChoice = nil, tellChoice = nil, tellTrue = false, revealed = false,
-        winner = nil, rerolls = 0, rerollInfo = nil }
+        winner = nil, rerolls = 0, rerollInfo = nil, drunkOut = false }
+    s.drunkStreak = 0
+    s.drunk = false
     s.intel = nil
     s.intelUsedToday = false
     s.intelOffers = {}
@@ -719,7 +726,10 @@ function GameLogic.ResetBanquetStats()
     s.specialEvents = {}
     s.guess = { active = false, playerDie = 0, opponentDie = 0, opponentChoice = nil,
         playerChoice = nil, tellChoice = nil, tellTrue = false, revealed = false,
-        winner = nil, rerolls = 0, rerollInfo = nil }
+        winner = nil, rerolls = 0, rerollInfo = nil, drunkOut = false }
+    -- 喝醉状态每日清零：只在同一场酒局内累计连败。
+    s.drunkStreak = 0
+    s.drunk = false
     return true
 end
 
@@ -775,6 +785,23 @@ function GameLogic.StartGuessRound()
     G.rerollInfo = nil
     G.winner = nil
     G.playerChoice = nil
+    G.drunkOut = false
+
+    -- 喝醉状态：本轮无法行动，直接判负（不摇骰、不选择）。
+    if s.drunk then
+        G.drunkOut = true
+        G.winner = "opponent"
+        G.playerDie, G.opponentDie = 0, 0
+        G.opponentChoice, G.playerChoice = nil, nil
+        G.tellChoice, G.tellTrue = nil, false
+        -- 醉倒只惩罚一轮：本局判负后清零，下一轮恢复行动能力。
+        -- 若不清零，连败计数会只增不减，导致此后永远醉倒、再无翻盘机会。
+        s.drunk = false
+        s.drunkStreak = 0
+        print("[Guess] 玩家已喝醉，本轮无法行动 → 直接判负（下轮恢复）")
+        return G
+    end
+
     GameLogic.RollGuessDice()
     return G
 end
@@ -886,6 +913,11 @@ function GameLogic.GuessFinish()
     if G.finished then return winner end
     -- 先标记再应用奖励/统计，重复调用或结算重入均不能再次生效。
     G.finished = true
+    -- 醉倒路径：已在 StartGuessRound 里判负并清零计数，这里不再重复结算。
+    if G.drunkOut then
+        print("[Guess] 醉倒结算，跳过连败累计")
+        return winner
+    end
     -- 模式差异：上班咯赢在人情，下班咯赢在气势。
     local isOffwork = s.mode == "offwork"
     if winner == "player" then
@@ -907,6 +939,18 @@ function GameLogic.GuessFinish()
     end
     -- 连胜统计：影响普老板乱入条件 C1
     GameLogic.RecordGuessOutcome(winner)
+    -- 喝醉累计：连续叫开失利达阈值 → 下一轮醉倒无法行动。
+    -- 平手重摇不算失利，只有真正输掉才计入。
+    if winner == "player" then
+        s.drunkStreak = 0
+        s.drunk = false
+    else
+        s.drunkStreak = s.drunkStreak + 1
+        if s.drunkStreak >= GameData.GuessDice.drunkLoseStreak then
+            s.drunk = true
+            print(string.format("[Guess] 连续失利 %d 次 → 喝醉，下一轮无法行动", s.drunkStreak))
+        end
+    end
     return winner
 end
 
@@ -917,6 +961,18 @@ function GameLogic.GetDiceResult()
     if not G or G.playerDie <= 0 or G.opponentDie <= 0 then return "tie" end
     if G.playerDie == G.opponentDie then return "tie" end
     return G.playerDie > G.opponentDie and "advantage" or "passive"
+end
+
+--- 当前是否处于喝醉状态（下一轮将无法行动）。
+function GameLogic.IsDrunk()
+    return GameLogic.State.drunk == true
+end
+
+--- 当前连续叫开失利次数 / 触发阈值，供 UI 显示进度。
+---@return number, number
+function GameLogic.GetDrunkProgress()
+    local s = GameLogic.State
+    return s.drunkStreak or 0, GameData.GuessDice.drunkLoseStreak
 end
 
 -- ============================================================================

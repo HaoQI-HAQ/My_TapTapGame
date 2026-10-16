@@ -601,6 +601,8 @@ GameData.GuessDice = {
     -- 性格对「选择预告」的信息量：越直爽越容易被看穿（预告更准），越精明越会藏。
     tellAccuracy = { vain = 0.55, humble = 0.60, blunt = 0.80, shrewd = 0.40 },
     maxRerolls = 6,
+    -- 「喝醉」状态：连续 N 轮叫开失利 → 下一轮醉倒，无法行动，直接判负。
+    drunkLoseStreak = 2,
 }
 
 --- 取某个选项的配置。
@@ -727,45 +729,57 @@ GameData.IntelAnswers = {
 }
 
 -- 普老板专属考核，按回合顺序轮换，不参与普通随机事件池。
+-- 人设：普瑞斯，穿高领衫的女性，全程喝茶不碰酒，说话短而锋利，只看结果和担当。
+-- 5 回合 = 4 个普通考核 + 1 个终局问答（最后一轮固定走 final）。
 GameData.BossEvents = {
     {
         id = "pu_strategy", type = "boss", trigger = "pu_rui_si",
-        text = "普老板·普瑞斯没有碰酒杯：\"我看的是结果。给你一个季度，你怎么让这个项目活下来？\"",
+        text = "普老板给自己续了杯茶，没碰酒：\"寒暄就免了。给你一个季度，这个项目怎么活？\"",
         choices = {
-            { text = "先核实现金流，给出里程碑和止损线", effects = { pro = 8, favor = 8, dignity = 3 } },
-            { text = "您一句话，我保证翻十倍！", effects = { face = 5, favor = -8, pro = -3 } },
+            { text = "先核实现金流，再定里程碑和止损线", effects = { pro = 8, favor = 8, dignity = 3 } },
+            { text = "您一句话，我保证翻十倍", effects = { face = 5, favor = -8, pro = -3 } },
             { text = "今晚先喝好，业务明天说", effects = { sober = -15, favor = -10 } },
-            { text = "先砍一半人，数据自然好看", effects = { dignity = -10, favor = -5 } },
+            { text = "先砍一半人，报表自然好看", effects = { dignity = -10, favor = -5 } },
         },
     },
     {
         id = "pu_accountability", type = "boss", trigger = "pu_rui_si",
-        text = "普老板放下一份亏损报告：\"供应商、团队、客户都说不是自己的错。你来负责，第一步做什么？\"",
+        text = "普老板把一份亏损报告推到你面前：\"供应商、团队、客户，都说不是自己的错。你第一步做什么？\"",
         choices = {
-            { text = "先承担协调责任，公开事实和补救计划", effects = { pro = 6, favor = 7, dignity = 5 } },
-            { text = "这是前任留下的锅", effects = { favor = -8, dignity = -5 } },
-            { text = "替团队罚三杯，别再问了", effects = { sober = -35, vibe = 8, favor = -5 } },
-            { text = "少汇报，先把报表修漂亮", effects = { favor = -10, dignity = -10 } },
+            { text = "先把协调责任揽下来，公开事实和补救计划", effects = { pro = 6, favor = 7, dignity = 5 } },
+            { text = "这是前任留下的坑", effects = { favor = -8, dignity = -5 } },
+            { text = "替团队罚三杯，这事就翻篇", effects = { sober = -35, vibe = 8, favor = -5 } },
+            { text = "先别汇报，把报表修漂亮", effects = { favor = -10, dignity = -10 } },
         },
     },
     {
         id = "pu_boundary", type = "boss", trigger = "pu_rui_si",
-        text = "普老板推开酒瓶：\"客户拿订单换一个不合规的承诺。今晚当着大家的面，你敢不敢拒绝？\"",
+        text = "普老板放下杯子：\"客户拿订单换一个不合规的承诺。今晚当着大家的面，你敢不敢拒？\"",
         choices = {
-            { text = "守住合规底线，并给出可执行的替代方案", effects = { favor = 8, pro = 6, dignity = 8 } },
+            { text = "守住底线，同时给出能落地的替代方案", effects = { favor = 8, pro = 6, dignity = 8 } },
             { text = "先答应下来，以后再想办法", effects = { face = 8, favor = -10, dignity = -8 } },
             { text = "都听您的，我不做决定", effects = { favor = -5, pro = -3 } },
             { text = "用喝酒把这个问题糊弄过去", effects = { sober = -20, vibe = 5, favor = -8 } },
         },
     },
     {
-        id = "pu_final_decision", type = "final", trigger = "pu_rui_si",
-        text = "【终局】普老板·普瑞斯合上文件：\"酒量不是任命书。最后一次回答：坐上这个位置，你愿意对谁负责？\"",
+        id = "pu_loyalty", type = "boss", trigger = "pu_rui_si",
+        text = "普老板忽然问：\"隔壁公司出三倍薪水挖你，你去不去？说实话。\"",
         choices = {
-            { text = "对团队、客户和结果负责，用承诺和事实接受考核", effects = { pro = 10, favor = 10, dignity = 5, bossApproval = true } },
+            { text = "钱是重要，但我更想把这摊事做完", effects = { favor = 8, pro = 5, dignity = 4 } },
+            { text = "去，谁跟钱过不去", effects = { dignity = 6, favor = -6 } },
+            { text = "您给多少我就留多少", effects = { face = -5, favor = -8, pro = -3 } },
+            { text = "看您给我什么位置吧", effects = { pro = 4, favor = -3 } },
+        },
+    },
+    {
+        id = "pu_final_decision", type = "final", trigger = "pu_rui_si",
+        text = "【终局】普老板合上文件，站起身：\"酒量不是任命书。最后一次回答：坐上这个位置，你愿意对谁负责？\"",
+        choices = {
+            { text = "对团队、客户和结果负责，用事实接受考核", effects = { pro = 10, favor = 10, dignity = 5, bossApproval = true } },
             { text = "只要您满意，其他都不重要", effects = { favor = -8, dignity = -10 } },
-            { text = "对明确的目标负责，也接受失败时的问责", effects = { pro = 8, favor = 8, dignity = 8, bossApproval = true } },
-            { text = "先喝完这杯，就算您答应了！", effects = { sober = -30, favor = -15 } },
+            { text = "对目标负责，也接受失败时的问责", effects = { pro = 8, favor = 8, dignity = 8, bossApproval = true } },
+            { text = "先喝完这杯，就算您答应了", effects = { sober = -30, favor = -15 } },
         },
     },
 }

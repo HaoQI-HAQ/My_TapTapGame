@@ -87,6 +87,7 @@ function Playing.Create(navigate)
     local alive, ready, chosen, rolling, settled = true, false, false, false, false
     ---@type number
     local rerollDelay = 0
+    local pendingDrunkSettle = false
     ---@type number
     local elapsed = 0
     local shownCharacters = 0
@@ -153,20 +154,27 @@ function Playing.Create(navigate)
             if G.winner then
                 Settle()
             else
-                -- 平手 → 重摇。用快照说清「刚才为什么算平手」。
+                -- 平手 → 亮出双方骰子让玩家看清，停留后再重摇。
                 local info = G.rerollInfo or {}
                 local mine = info.playerDie or G.playerDie
                 local theirs = info.opponentDie or G.opponentDie
                 local mineChoice = GameData.GuessChoiceLabel(info.playerChoice or choice.id)
                 local hisChoice = GameData.GuessTellLabel(info.opponentChoice or G.opponentChoice)
                 local why = info.reason == "both_hit" and "两人都押中了" or "两人都没押中"
-                status:SetText(why .. " —— 平手，重新摇骰再选…")
+                status:SetText(why .. " —— 平手，即将重摇…")
                 result:SetText("刚才：你 " .. mine .. " 点（" .. mineChoice ..
                     "） · 他 " .. theirs .. " 点（" .. hisChoice .. "）" ..
                     "\n" .. why .. "，本局平手作废。")
                 result:Show()
+                -- 平手也要亮骰：对手的骰盅打开、点数亮出，让玩家有反应时间。
+                tellIcon:SetText(GameData.GuessTellLabel(info.opponentChoice or G.opponentChoice))
+                hiddenCup:Hide()
+                opponentDice:Show()
+                opponentResult:SetText("对方 · " .. theirs .. " 点")
+                opponentDice:Roll(theirs)
                 PlaySfx("reroll", 0.75)
-                rerollDelay = 1.2
+                -- 展示 2 秒再重摇，避免结果一闪而过。
+                rerollDelay = 2.0
                 RefreshActions()
             end
         end, true,
@@ -314,6 +322,24 @@ function Playing.Create(navigate)
         actionPanel:Hide()
         rollButton:Hide()
         local won = G.winner == "player"
+
+        -- 喝醉分支：本轮无法行动，直接判负，不展示骰子。
+        if G.drunkOut then
+            tellCaption:SetText("你已喝醉")
+            tellIcon:SetText("🍺")
+            status:SetText("你已喝醉，本轮无法行动 —— 话语权归他")
+            result:SetText("连着输了两手，酒劲上头，你连骰子都拿不稳了。" ..
+                "\n本轮直接判负，下一轮清醒过来再战。")
+            result:Show()
+            PlaySfx("lose", 0.8)
+            hiddenCup:Show()
+            opponentDice:Hide()
+            opponentResult:SetText("对方 · 未叫开")
+            resultContinue:Show()
+            print("[BanquetUI] 喝醉判负（下轮恢复）")
+            return
+        end
+
         local mine, theirs = G.playerDie, G.opponentDie
         local relation = mine > theirs and "你的点数更大" or (mine < theirs and "他的点数更大" or "双方点数相同")
         status:SetText(won and "你押中了，赢得本轮话语权" or "他没让你得逞，本轮话语权归他")
@@ -365,11 +391,23 @@ function Playing.Create(navigate)
     local function BeginRoll()
         if not alive or rolling or settled then return end
         local G = GameLogic.StartGuessRound()
-        rolling = true
         legend:Hide()
-        RefreshActions()
         rollButton:Hide()
         ownCup:Hide()
+        -- 喝醉：本轮不摇骰，直接展示判负结果（等 1.5 秒让玩家看清）。
+        if G.drunkOut then
+            rolling = true
+            status:SetText("你已喝醉，连骰子都拿不稳…")
+            playerResult:SetText("我方 · 醉倒")
+            hiddenCup:Show()
+            opponentDice:Hide()
+            RefreshActions()
+            rerollDelay = 1.5
+            pendingDrunkSettle = true
+            return
+        end
+        rolling = true
+        RefreshActions()
         playerDice:Show()
         PlaySound(false)
         status:SetText("骰子落定后，轮到你选。")
@@ -419,7 +457,14 @@ function Playing.Create(navigate)
         end
         if rerollDelay > 0 then
             rerollDelay = rerollDelay - dt
-            if rerollDelay <= 0 then ShowRoll() end
+            if rerollDelay <= 0 then
+                if pendingDrunkSettle then
+                    pendingDrunkSettle = false
+                    Settle()
+                else
+                    ShowRoll()
+                end
+            end
         end
         if typing then
             elapsed = elapsed + dt
