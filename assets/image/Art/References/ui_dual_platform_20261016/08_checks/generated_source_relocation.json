@@ -1,0 +1,20 @@
+{
+  "relocated_generated_files": [
+    "jiuzhuo_bg_bbq_portrait_clean_v1_20261016022902.png",
+    "jiuzhuo_fg_table_empty_cutout_v1_20261016022851.png",
+    "jiuzhuo_intern_embarrassed_cutout_v1_20261016022319.png",
+    "jiuzhuo_leader_satisfied_cutout_v1_20261016022326.png",
+    "jiuzhuo_mobile_landscape_dialogue_v1_20261016022329.png",
+    "jiuzhuo_mobile_portrait_dialogue_v1_20261016022330.png",
+    "jiuzhuo_mobile_portrait_main_menu_v1_20261016022338.png",
+    "jiuzhuo_mobile_portrait_settlement_v1_20261016022334.png",
+    "jiuzhuo_prop_layoff_box_cutout_v1_20261016022858.png",
+    "jiuzhuo_ui_buttons_blank_sheet_v1_20261016022321.png",
+    "jiuzhuo_ui_icons_sheet_v1_20261016022321.png",
+    "jiuzhuo_ui_panels_blank_sheet_v1_20261016022325.png"
+  ],
+  "new_location": "00_sources/gpt_raw",
+  "verified_identical_before_relocation": true,
+  "existing_user_assets_modified": false,
+  "reason": "新生图统一归档到已排除构建的References目录，不使其进入现有运行包"
+}

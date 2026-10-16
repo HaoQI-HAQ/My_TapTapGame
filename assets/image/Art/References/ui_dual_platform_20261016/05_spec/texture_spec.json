@@ -1,0 +1,113 @@
+{
+  "schema_version": "1.0",
+  "date": "2026-10-16",
+  "package_root": "assets/image/Art/References/ui_dual_platform_20261016",
+  "status": "reference_candidate_only",
+  "runtime_integration": false,
+  "scope": "本文件只描述美术交付与缩放契约，不修改引擎设置或运行纹理。路径均相对本包。",
+  "delivery_target": {
+    "format": "PNG",
+    "bit_depth_per_channel": 8,
+    "pixel_mode": "RGBA",
+    "color_space": "sRGB",
+    "alpha": "straight_alpha_in_source_png",
+    "opaque_background_alpha": 255,
+    "actual_modes": "asset_manifest.json逐件记录；源稿、整屏参考和背景目前存在RGB文件，不宣称已统一转换",
+    "color_metadata": "清单区分embedded_srgb与untagged；未标记文件的工作目标为sRGB，不等于已验证其原始配置",
+    "font_and_dynamic_text": "正文与UI使用工程已有NotoSansSC Regular/Bold/Black，本轮不导出或替换字体。按钮和面板底图不烘焙姓名、台词、数值、选项。ui_logo_jiuzhuo为固定标题墨字；骰点和图标符号是图形。"
+  },
+  "layout_units": {
+    "pc": {
+      "design_px": [1920, 1080],
+      "logical_size": [1920, 1080],
+      "design_scale": 1,
+      "recommended_safe_ltrb_design_px": [48, 36, 48, 36],
+      "body_text_design_px": [26, 32],
+      "answers": "2x2"
+    },
+    "mobile_portrait": {
+      "design_px": [1080, 1920],
+      "logical_dp": [360, 640],
+      "design_px_per_dp": 3,
+      "recommended_safe_ltrb_design_px": [60, 96, 60, 96],
+      "body_text_design_px": [48, 54],
+      "min_cta_height_design_px": 144,
+      "min_answer_height_design_px": 144,
+      "min_touch_target_dp": [48, 48],
+      "min_touch_target_design_px": [144, 144],
+      "answers": "single_column_4_items",
+      "gpt_draft_caveat": "130px答案仅43.3dp，不满足48dp；精确合成和后续接入必须按144px复核"
+    },
+    "mobile_landscape": {
+      "design_px": [1920, 1080],
+      "logical_dp": [800, 450],
+      "design_px_per_dp": 2.4,
+      "recommended_safe_ltrb_design_px": [150, 60, 150, 60],
+      "body_text_logical_dp": [16, 20],
+      "body_text_design_px": [38.4, 48],
+      "min_cta_height_dp": 48,
+      "min_answer_height_dp": 48,
+      "min_touch_target_dp": [48, 48],
+      "min_touch_target_design_px_ceil": [116, 116],
+      "answers": "2x2",
+      "gpt_draft_caveat": "gpt_dialogue_unretouched状态文字明显错误，状态栏缺项/遮挡，未遵守精确安全区，只作缺陷参考"
+    },
+    "safe_area_rule": "将系统safe inset换算至同一坐标系，各边effective_inset=max(recommended_inset, system_inset)，再布局；推荐边距不保证所有设备安全",
+    "orientation_status": "工程当前仍landscape，未改配置。主竖屏为美术提案，不是已实现方向适配。",
+    "aspect_ratio_rule": "长屏背景等比cover裁切，UI重排；人物/图标/logo等比contain；禁止整屏非等比拉伸"
+  },
+  "nine_slice_contract": {
+    "coordinate_order": "left_top_right_bottom",
+    "coordinate_unit": "source_texture_pixel",
+    "coordinates_are_not": ["text_padding", "hitbox_size", "display_size"],
+    "border_scaling": "四角与边框按同一比例缩放，中心伸展；目标纹理尺寸与命中框独立",
+    "max_border_scale_formula": "s_max=min(target_width/(left+right), target_height/(top+bottom))；实际s应更小并留出正中心区",
+    "button_144px_warning": "源按钮top+bottom=160，显示高度144时s必须小于0.9；不能直接固定160px边框后压成144px",
+    "source_content_padding": "本轮没有逐件认证的文字安全内边距，接入前须据实际Alpha边缘和合成文字框核验",
+    "alpha_trim_conversion": "若先裁Alpha外留白，必须记录原裁切框，原切线按裁切偏移换算后再缩放；不能把原源图切线直接套裁小图。layout_spec另记source_alpha_crop_px/corner_scale/nine_slice_render_ltrb_px。",
+    "validation": "核验切线不越界、缩放中心区非负、描边/圆角不变形、文字与触摸目标满足三端规范"
+  },
+  "textures": [
+    {"path":"02_components/buttons/ui_btn_primary_normal.png","expected_size_px":[1024,320],"resize":"nine_slice","nine_slice_ltrb_source_px":[92,72,92,88]},
+    {"path":"02_components/buttons/ui_btn_primary_focus.png","expected_size_px":[1024,320],"resize":"nine_slice","nine_slice_ltrb_source_px":[92,72,92,88]},
+    {"path":"02_components/buttons/ui_btn_primary_pressed.png","expected_size_px":[1024,320],"resize":"nine_slice","nine_slice_ltrb_source_px":[92,72,92,88]},
+    {"path":"02_components/buttons/ui_btn_secondary_normal.png","expected_size_px":[1024,320],"resize":"nine_slice","nine_slice_ltrb_source_px":[92,72,92,88]},
+    {"path":"02_components/buttons/ui_btn_secondary_pressed.png","expected_size_px":[1024,320],"resize":"nine_slice","nine_slice_ltrb_source_px":[92,72,92,88]},
+    {"path":"02_components/buttons/ui_btn_option_normal.png","expected_size_px":[1024,320],"resize":"nine_slice","nine_slice_ltrb_source_px":[92,72,92,88]},
+    {"path":"02_components/buttons/ui_btn_option_selected.png","expected_size_px":[1024,320],"resize":"nine_slice","nine_slice_ltrb_source_px":[92,72,92,88],"note":"无字无勾选底图；标记用独立ui_icon_check叠加，07_review_crops含勾选裁片不可代替"},
+    {"path":"02_components/buttons/ui_btn_disabled.png","expected_size_px":[1024,320],"resize":"nine_slice","nine_slice_ltrb_source_px":[92,72,92,88],"note":"通用禁用底图，不代表每类按钮都有独立禁用态"},
+    {"path":"02_components/panels/ui_panel_dialogue.png","expected_size_px":[1024,512],"resize":"nine_slice","nine_slice_ltrb_source_px":[100,84,100,84]},
+    {"path":"02_components/panels/ui_panel_settlement.png","expected_size_px":[1024,1024],"resize":"nine_slice","nine_slice_ltrb_source_px":[100,100,100,100]},
+    {"path":"02_components/panels/ui_panel_status_pill.png","expected_size_px":[1024,384],"resize":"nine_slice","nine_slice_ltrb_source_px":[164,90,164,90]},
+    {"path":"02_components/panels/ui_panel_brush_gold.png","expected_size_px":[1024,320],"resize":"contain","nine_slice_ltrb_source_px":null,"note":"笔刷轮廓不作普通九宫格"},
+    {"path":"02_components/panels/ui_panel_brush_ink.png","expected_size_px":[1024,320],"resize":"contain","nine_slice_ltrb_source_px":null,"note":"笔刷轮廓不作普通九宫格"},
+    {"path":"02_components/panels/ui_panel_speech.png","expected_size_px":[1024,640],"resize":"contain","nine_slice_ltrb_source_px":null,"note":"气泡整体等比contain，tail固定，禁止九宫格拉坏尾巴"},
+    {"path":"02_components/panels/ui_logo_jiuzhuo.png","expected_size_px":[1024,384],"resize":"contain","nine_slice_ltrb_source_px":null,"source":"00_sources/pc_originals/v2_ui_01_main_menu_20261014130234.png","note":"原PC固定标题黑墨字分离，不含黄色纸底；静态标题允许含字，非动态文字面板"}
+  ],
+  "category_rules": {
+    "02_components/icons": {"expected_size_px":[256,256],"resize":"contain","nine_slice":false,"count_observed_at_spec_write":16},
+    "03_characters": {"resize":"contain","nine_slice":false,"layering_status":"whole_image_only_not_body_head_face_prop","expression_alignment_status":"not_geometrically_aligned","count_observed_at_spec_write":9},
+    "04_backgrounds_foregrounds/bg_bbq_landscape.png": {"expected_size_px":[1920,1080],"resize":"cover","nine_slice":false,"observed_pixel_mode":"RGB"},
+    "04_backgrounds_foregrounds/bg_bbq_portrait.png": {"expected_size_px":[1080,1920],"resize":"cover","nine_slice":false,"observed_pixel_mode":"RGB"},
+    "04_backgrounds_foregrounds/fg_table_empty.png": {"expected_size_px":[1920,1080],"resize":"preserve_aspect_reposition_for_composition","nine_slice":false},
+    "04_backgrounds_foregrounds/prop_layoff_box.png": {"expected_size_px":[1024,1024],"resize":"contain","nine_slice":false},
+    "01_layouts": {"usage":"flat_reference_or_composite_preview_only","not_runtime_screenshot":true,"must_not_replace_interactive_ui":true},
+    "07_review_crops": {"usage":"review_only","blank_texture_eligible":false},
+    "06_layered_sources": {"usage":"editable_whole_screen_composition_only","delivered_ora_count":7,"delivered_layer_count":198,"text_editability":"independent_raster_text_layer_with_strings_font_and_boxes_in_layout_spec_json","not_character_internal_layers":true,"not_psd":true}
+  },
+  "atlas_recommendation": {
+    "status": "not_delivered",
+    "padding_px_min": 4,
+    "edge_color_extrude_px_min": 2,
+    "rotate_nine_slice": false,
+    "trim_nine_slice": false,
+    "trim_other_textures": "若裁透明边，另记原画布偏移；本轮不声明已完成图集"
+  },
+  "acceptance_pending": [
+    "运行接入另需授权；本轮v2参考风格已确定，现行AfterHours未替换",
+    "合成/ORA/layout_spec已存在且设计结构已记录；实际safe inset、长文案、字号推荐与运行触摸行为仍需接入后复核",
+    "角色内部真分层与同母图局部表情对齐，当前未完成",
+    "逐件透明边缘、九宫格目标缩放和气泡tail复核",
+    "后续独立授权运行接入与真机验收；本轮不执行"
+  ]
+}

@@ -1,6 +1,7 @@
 -- 黄橙手绘与深蓝酒桌主题；运行素材与制作参考分目录保存。
 -- 路径为资源根相对路径；保留完整字面量，供构建器扫描引用。
 local UI = require("urhox-libs/UI")
+local ImageCache = require("urhox-libs/UI/Core/ImageCache")
 local GameData = require("Data.GameData")
 local Art = {}
 Art.C = {
@@ -166,11 +167,15 @@ function Art.Picture(path, extra)
             UI.Panel.Render(self, vg)
             return
         end
-        local image = cache:GetResource("Image", imagePath)
-        if not image or image.width <= 0 or image.height <= 0 then return end
+        -- 使用 UI 已加载的 GPU 纹理尺寸，兼容 PNG 的平台压缩变体与 DWP 热替换。
+        -- 不用 Image 解码：BC/ASTC 等 KTX 是纹理格式，部分平台不能作为 CPU Image 读取。
+        if ImageCache.Get(imagePath) <= 0 then return end
+        local imageWidth, imageHeight = ImageCache.GetSize(imagePath)
+        if imageWidth <= 0 or imageHeight <= 0 then return end
         local rect = self:GetAbsoluteLayout()
-        local ratio = math.min(rect.w / image.width, rect.h / image.height)
-        local width, height = image.width * ratio, image.height * ratio
+        if rect.w <= 0 or rect.h <= 0 then return end
+        local ratio = math.min(rect.w / imageWidth, rect.h / imageHeight)
+        local width, height = imageWidth * ratio, imageHeight * ratio
         local tint = props.imageTint --[[@as RGBAColor?]]
         self:RenderBackgroundImage(vg, imagePath,
             {x = rect.x + (rect.w - width) / 2, y = rect.y + (rect.h - height) / 2,

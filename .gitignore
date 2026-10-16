@@ -54,3 +54,10 @@ _uploads/
 
 # Captures (regenerable from art spec)
 screenshots/
+
+# Local runtime preferences (written by the running game)
+ui_preferences.json
+
+# Delivery archives: contents already committed as loose files; the largest
+# exceeds GitHub's 100 MB per-file limit. Rebuild with the packaging script.
+assets/image/Art/References/ui_dual_platform_20261016/09_package/

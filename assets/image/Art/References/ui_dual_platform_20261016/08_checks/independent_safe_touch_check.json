@@ -1,0 +1,47 @@
+{
+  "scope": "仅设计坐标核验，不是游戏实际hit测试",
+  "screens": [
+    {
+      "screen": "pc_main_menu",
+      "interactive_target_count": 4,
+      "failed_checks": [],
+      "pass": true
+    },
+    {
+      "screen": "mobile_portrait_main_menu",
+      "interactive_target_count": 4,
+      "failed_checks": [],
+      "pass": true
+    },
+    {
+      "screen": "mobile_portrait_dialogue",
+      "interactive_target_count": 5,
+      "failed_checks": [],
+      "pass": true
+    },
+    {
+      "screen": "pc_dialogue",
+      "interactive_target_count": 5,
+      "failed_checks": [],
+      "pass": true
+    },
+    {
+      "screen": "mobile_landscape_dialogue",
+      "interactive_target_count": 5,
+      "failed_checks": [],
+      "pass": true
+    },
+    {
+      "screen": "mobile_portrait_success",
+      "interactive_target_count": 1,
+      "failed_checks": [],
+      "pass": true
+    },
+    {
+      "screen": "pc_success",
+      "interactive_target_count": 1,
+      "failed_checks": [],
+      "pass": true
+    }
+  ]
+}

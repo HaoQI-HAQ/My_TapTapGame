@@ -1,0 +1,24 @@
+{
+  "originals": {
+    "v2_ui_01_main_menu_20261014130234.png": "5bba05c7e5b24efea7ed46fee5b678d31482a878b9d17af455325ebe85ecd48b",
+    "v2_ui_02_dialogue_20261014130121.png": "6827666d4a4e8de295f7648e5a5607fe73953c7db409299a79d942ec93c56105",
+    "v2_ui_03_feedback_spec_20261014130121.png": "ebcbe62fbaf67afd1f9f73a47fa3e1fe995d9420c8bfffef390dfd7d7eecafaa",
+    "v2_char_intern_normal_20261014125618.png": "89e331e430bffe8b2d3efd4a38b33c2f4c4a5ec178293381068d79e7925eabd0",
+    "v2_npc_leader_normal_20261014125559.png": "63ec1b415868cc04e3e52a083d0ee579452cf0016366d126de90becc6c8d49d6",
+    "v2_bg_t1_bbq_20261014125730.png": "13b0ceff29d1930503c7e540a8e342b20269fa324aaa2d8cb2658a6060894f66"
+  },
+  "gpt_raws": [
+    "jiuzhuo_bg_bbq_portrait_clean_v1_20261016022902.png",
+    "jiuzhuo_fg_table_empty_cutout_v1_20261016022851.png",
+    "jiuzhuo_intern_embarrassed_cutout_v1_20261016022319.png",
+    "jiuzhuo_leader_satisfied_cutout_v1_20261016022326.png",
+    "jiuzhuo_mobile_landscape_dialogue_v1_20261016022329.png",
+    "jiuzhuo_mobile_portrait_dialogue_v1_20261016022330.png",
+    "jiuzhuo_mobile_portrait_main_menu_v1_20261016022338.png",
+    "jiuzhuo_mobile_portrait_settlement_v1_20261016022334.png",
+    "jiuzhuo_prop_layoff_box_cutout_v1_20261016022858.png",
+    "jiuzhuo_ui_buttons_blank_sheet_v1_20261016022321.png",
+    "jiuzhuo_ui_icons_sheet_v1_20261016022321.png",
+    "jiuzhuo_ui_panels_blank_sheet_v1_20261016022325.png"
+  ]
+}

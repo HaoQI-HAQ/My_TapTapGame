@@ -1,0 +1,536 @@
+{
+  "scope": "离线美术结构/原图保护/ORA真实叠层/设计安全框检查，不是游戏接入与实机验收",
+  "originals_unchanged": {
+    "v2_ui_01_main_menu_20261014130234.png": true,
+    "v2_ui_02_dialogue_20261014130121.png": true,
+    "v2_ui_03_feedback_spec_20261014130121.png": true,
+    "v2_char_intern_normal_20261014125618.png": true,
+    "v2_npc_leader_normal_20261014125559.png": true,
+    "v2_bg_t1_bbq_20261014125730.png": true
+  },
+  "screen_count": 7,
+  "layer_count_total": 198,
+  "screens": [
+    {
+      "screen": "pc_main_menu",
+      "canvas_px": [
+        1920,
+        1080
+      ],
+      "layers": 12,
+      "ora_mimetype_first_stored": true,
+      "ora_mimetype_correct": true,
+      "crc_ok": true,
+      "rebuild_matches_merged_and_png": true,
+      "all_text_within_design_safe_area": true,
+      "interactive_targets": [
+        {
+          "id": "sound_toggle",
+          "interactive": true,
+          "icon_visual_rect_px": [
+            1798,
+            43,
+            70,
+            56
+          ],
+          "rect_px": [
+            1792,
+            36,
+            80,
+            80
+          ],
+          "hit_size_logical": [
+            80.0,
+            80.0
+          ],
+          "safe_area_pass": true
+        },
+        {
+          "id": "start_employment",
+          "interactive": true,
+          "rect_px": [
+            90,
+            580,
+            640,
+            164
+          ],
+          "height_logical": 164.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "character_gallery",
+          "interactive": true,
+          "rect_px": [
+            90,
+            780,
+            302,
+            112
+          ],
+          "height_logical": 112.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "settings",
+          "interactive": true,
+          "rect_px": [
+            428,
+            780,
+            302,
+            112
+          ],
+          "height_logical": 112.0,
+          "safe_area_pass": true
+        }
+      ]
+    },
+    {
+      "screen": "mobile_portrait_main_menu",
+      "canvas_px": [
+        1080,
+        1920
+      ],
+      "layers": 13,
+      "ora_mimetype_first_stored": true,
+      "ora_mimetype_correct": true,
+      "crc_ok": true,
+      "rebuild_matches_merged_and_png": true,
+      "all_text_within_design_safe_area": true,
+      "interactive_targets": [
+        {
+          "id": "sound_toggle",
+          "interactive": true,
+          "icon_visual_rect_px": [
+            954,
+            110,
+            60,
+            48
+          ],
+          "rect_px": [
+            876,
+            96,
+            144,
+            144
+          ],
+          "hit_size_logical": [
+            48.0,
+            48.0
+          ],
+          "safe_area_pass": true
+        },
+        {
+          "id": "start_employment",
+          "interactive": true,
+          "rect_px": [
+            60,
+            1450,
+            960,
+            168
+          ],
+          "height_logical": 56.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "character_gallery",
+          "interactive": true,
+          "rect_px": [
+            60,
+            1630,
+            466,
+            144
+          ],
+          "height_logical": 48.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "settings",
+          "interactive": true,
+          "rect_px": [
+            554,
+            1630,
+            466,
+            144
+          ],
+          "height_logical": 48.0,
+          "safe_area_pass": true
+        }
+      ]
+    },
+    {
+      "screen": "mobile_portrait_dialogue",
+      "canvas_px": [
+        1080,
+        1920
+      ],
+      "layers": 40,
+      "ora_mimetype_first_stored": true,
+      "ora_mimetype_correct": true,
+      "crc_ok": true,
+      "rebuild_matches_merged_and_png": true,
+      "all_text_within_design_safe_area": true,
+      "interactive_targets": [
+        {
+          "id": "header_pause",
+          "interactive": true,
+          "icon_visual_rect_px": [
+            954,
+            198,
+            60,
+            60
+          ],
+          "rect_px": [
+            876,
+            156,
+            144,
+            144
+          ],
+          "hit_size_logical": [
+            48.0,
+            48.0
+          ],
+          "safe_area_pass": true
+        },
+        {
+          "id": "intern_info",
+          "interactive": false,
+          "rect_px": [
+            480,
+            796,
+            41,
+            42
+          ],
+          "reason": "Reference i visual indicator only; no tooltip/game rule invented"
+        },
+        {
+          "id": "leader_info",
+          "interactive": false,
+          "rect_px": [
+            978,
+            796,
+            41,
+            42
+          ],
+          "reason": "Reference i visual indicator only; no tooltip/game rule invented"
+        },
+        {
+          "id": "answer_A",
+          "interactive": true,
+          "rect_px": [
+            60,
+            1190,
+            960,
+            144
+          ],
+          "height_logical": 48.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "answer_B",
+          "interactive": true,
+          "rect_px": [
+            60,
+            1350,
+            960,
+            144
+          ],
+          "height_logical": 48.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "answer_C",
+          "interactive": true,
+          "rect_px": [
+            60,
+            1510,
+            960,
+            144
+          ],
+          "height_logical": 48.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "answer_D",
+          "interactive": true,
+          "rect_px": [
+            60,
+            1670,
+            960,
+            144
+          ],
+          "height_logical": 48.0,
+          "safe_area_pass": true
+        }
+      ]
+    },
+    {
+      "screen": "pc_dialogue",
+      "canvas_px": [
+        1920,
+        1080
+      ],
+      "layers": 40,
+      "ora_mimetype_first_stored": true,
+      "ora_mimetype_correct": true,
+      "crc_ok": true,
+      "rebuild_matches_merged_and_png": true,
+      "all_text_within_design_safe_area": true,
+      "interactive_targets": [
+        {
+          "id": "header_pause",
+          "interactive": true,
+          "icon_visual_rect_px": [
+            1804,
+            36,
+            64,
+            64
+          ],
+          "rect_px": [
+            1792,
+            36,
+            80,
+            80
+          ],
+          "hit_size_logical": [
+            80.0,
+            80.0
+          ],
+          "safe_area_pass": true
+        },
+        {
+          "id": "intern_info",
+          "interactive": false,
+          "rect_px": [
+            800,
+            582,
+            45,
+            46
+          ],
+          "reason": "Reference i visual indicator only; no tooltip/game rule invented"
+        },
+        {
+          "id": "leader_info",
+          "interactive": false,
+          "rect_px": [
+            1821,
+            582,
+            45,
+            46
+          ],
+          "reason": "Reference i visual indicator only; no tooltip/game rule invented"
+        },
+        {
+          "id": "answer_A",
+          "interactive": true,
+          "rect_px": [
+            48,
+            844,
+            900,
+            94
+          ],
+          "height_logical": 94.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "answer_B",
+          "interactive": true,
+          "rect_px": [
+            972,
+            844,
+            900,
+            94
+          ],
+          "height_logical": 94.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "answer_C",
+          "interactive": true,
+          "rect_px": [
+            48,
+            950,
+            900,
+            94
+          ],
+          "height_logical": 94.0,
+          "safe_area_pass": true
+        },
+        {
+          "id": "answer_D",
+          "interactive": true,
+          "rect_px": [
+            972,
+            950,
+            900,
+            94
+          ],
+          "height_logical": 94.0,
+          "safe_area_pass": true
+        }
+      ]
+    },
+    {
+      "screen": "mobile_landscape_dialogue",
+      "canvas_px": [
+        1920,
+        1080
+      ],
+      "layers": 40,
+      "ora_mimetype_first_stored": true,
+      "ora_mimetype_correct": true,
+      "crc_ok": true,
+      "rebuild_matches_merged_and_png": true,
+      "all_text_within_design_safe_area": true,
+      "interactive_targets": [
+        {
+          "id": "header_pause",
+          "interactive": true,
+          "icon_visual_rect_px": [
+            1722,
+            68,
+            48,
+            48
+          ],
+          "rect_px": [
+            1654,
+            60,
+            116,
+            116
+          ],
+          "hit_size_logical": [
+            48.333333333333336,
+            48.333333333333336
+          ],
+          "safe_area_pass": true
+        },
+        {
+          "id": "intern_info",
+          "interactive": false,
+          "rect_px": [
+            767,
+            462,
+            43,
+            44
+          ],
+          "reason": "Reference i visual indicator only; no tooltip/game rule invented"
+        },
+        {
+          "id": "leader_info",
+          "interactive": false,
+          "rect_px": [
+            1722,
+            462,
+            43,
+            44
+          ],
+          "reason": "Reference i visual indicator only; no tooltip/game rule invented"
+        },
+        {
+          "id": "answer_A",
+          "interactive": true,
+          "rect_px": [
+            150,
+            750,
+            800,
+            128
+          ],
+          "height_logical": 53.333333333333336,
+          "safe_area_pass": true
+        },
+        {
+          "id": "answer_B",
+          "interactive": true,
+          "rect_px": [
+            970,
+            750,
+            800,
+            128
+          ],
+          "height_logical": 53.333333333333336,
+          "safe_area_pass": true
+        },
+        {
+          "id": "answer_C",
+          "interactive": true,
+          "rect_px": [
+            150,
+            892,
+            800,
+            128
+          ],
+          "height_logical": 53.333333333333336,
+          "safe_area_pass": true
+        },
+        {
+          "id": "answer_D",
+          "interactive": true,
+          "rect_px": [
+            970,
+            892,
+            800,
+            128
+          ],
+          "height_logical": 53.333333333333336,
+          "safe_area_pass": true
+        }
+      ]
+    },
+    {
+      "screen": "mobile_portrait_success",
+      "canvas_px": [
+        1080,
+        1920
+      ],
+      "layers": 26,
+      "ora_mimetype_first_stored": true,
+      "ora_mimetype_correct": true,
+      "crc_ok": true,
+      "rebuild_matches_merged_and_png": true,
+      "all_text_within_design_safe_area": true,
+      "interactive_targets": [
+        {
+          "id": "continue_next_day",
+          "interactive": true,
+          "rect_px": [
+            106,
+            1640,
+            868,
+            144
+          ],
+          "height_logical": 48.0,
+          "safe_area_pass": true
+        }
+      ]
+    },
+    {
+      "screen": "pc_success",
+      "canvas_px": [
+        1920,
+        1080
+      ],
+      "layers": 27,
+      "ora_mimetype_first_stored": true,
+      "ora_mimetype_correct": true,
+      "crc_ok": true,
+      "rebuild_matches_merged_and_png": true,
+      "all_text_within_design_safe_area": true,
+      "interactive_targets": [
+        {
+          "id": "continue_next_day",
+          "interactive": true,
+          "rect_px": [
+            1060,
+            910,
+            750,
+            92
+          ],
+          "height_logical": 92.0,
+          "safe_area_pass": true
+        }
+      ]
+    }
+  ],
+  "runtime_code_changed": false,
+  "runtime_integration": false,
+  "character_semantic_layering": "未完成body/head/face/prop真分层，现为整张角色独立画面层",
+  "expression_alignment": "补绘候选未完成同母图几何对齐",
+  "layout_spec_contains_executable_recipe": false
+}

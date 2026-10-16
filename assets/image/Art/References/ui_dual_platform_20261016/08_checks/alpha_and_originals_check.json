@@ -1,0 +1,869 @@
+{
+  "checks": "实际尺寸/Alpha/画布边界/原图哈希，不等同于游戏实机适配验收",
+  "originals_unchanged": {
+    "v2_ui_01_main_menu_20261014130234.png": true,
+    "v2_ui_02_dialogue_20261014130121.png": true,
+    "v2_ui_03_feedback_spec_20261014130121.png": true,
+    "v2_char_intern_normal_20261014125618.png": true,
+    "v2_npc_leader_normal_20261014125559.png": true,
+    "v2_bg_t1_bbq_20261014125730.png": true
+  },
+  "assets": [
+    {
+      "file": "02_components/buttons/ui_btn_disabled.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 66876,
+      "visible_bbox": [
+        25,
+        24,
+        999,
+        296
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/buttons/ui_btn_option_normal.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 71071,
+      "visible_bbox": [
+        24,
+        25,
+        1000,
+        294
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/buttons/ui_btn_option_selected.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 71071,
+      "visible_bbox": [
+        24,
+        25,
+        1000,
+        294
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/buttons/ui_btn_primary_focus.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 77521,
+      "visible_bbox": [
+        43,
+        24,
+        981,
+        296
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/buttons/ui_btn_primary_normal.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 70317,
+      "visible_bbox": [
+        28,
+        24,
+        995,
+        296
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/buttons/ui_btn_primary_pressed.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 77344,
+      "visible_bbox": [
+        40,
+        24,
+        983,
+        296
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/buttons/ui_btn_secondary_normal.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 70059,
+      "visible_bbox": [
+        30,
+        24,
+        994,
+        296
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/buttons/ui_btn_secondary_pressed.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 76592,
+      "visible_bbox": [
+        40,
+        24,
+        984,
+        296
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_badge.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 39282,
+      "visible_bbox": [
+        57,
+        18,
+        198,
+        238
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_check.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 45950,
+      "visible_bbox": [
+        18,
+        35,
+        238,
+        220
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_day.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 23418,
+      "visible_bbox": [
+        18,
+        18,
+        237,
+        238
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_dice_five.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 20818,
+      "visible_bbox": [
+        18,
+        20,
+        238,
+        235
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_dice_three.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 20493,
+      "visible_bbox": [
+        18,
+        19,
+        238,
+        237
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_dignity.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 34593,
+      "visible_bbox": [
+        32,
+        18,
+        224,
+        238
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_face.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 39188,
+      "visible_bbox": [
+        18,
+        19,
+        238,
+        236
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_favor.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 33953,
+      "visible_bbox": [
+        18,
+        30,
+        238,
+        225
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_info.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 27785,
+      "visible_bbox": [
+        19,
+        18,
+        236,
+        238
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_money.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 28192,
+      "visible_bbox": [
+        18,
+        19,
+        238,
+        236
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_pause.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 27508,
+      "visible_bbox": [
+        18,
+        18,
+        238,
+        237
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_rank.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 33943,
+      "visible_bbox": [
+        21,
+        18,
+        235,
+        238
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_round.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 33981,
+      "visible_bbox": [
+        18,
+        18,
+        237,
+        238
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_sober.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 35186,
+      "visible_bbox": [
+        18,
+        31,
+        238,
+        224
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_sound.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 40302,
+      "visible_bbox": [
+        18,
+        40,
+        238,
+        215
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/icons/ui_icon_vibe.png",
+      "size": [
+        256,
+        256
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 38051,
+      "visible_bbox": [
+        18,
+        28,
+        238,
+        227
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/panels/ui_logo_jiuzhuo.png",
+      "size": [
+        1024,
+        384
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 299430,
+      "visible_bbox": [
+        145,
+        70,
+        897,
+        326
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/panels/ui_panel_brush_gold.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 110564,
+      "visible_bbox": [
+        24,
+        31,
+        1000,
+        288
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/panels/ui_panel_brush_ink.png",
+      "size": [
+        1024,
+        320
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 115481,
+      "visible_bbox": [
+        24,
+        35,
+        1000,
+        285
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/panels/ui_panel_dialogue.png",
+      "size": [
+        1024,
+        512
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 79810,
+      "visible_bbox": [
+        24,
+        24,
+        1000,
+        487
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/panels/ui_panel_settlement.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 200951,
+      "visible_bbox": [
+        24,
+        59,
+        1000,
+        965
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/panels/ui_panel_speech.png",
+      "size": [
+        1024,
+        640
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 252410,
+      "visible_bbox": [
+        24,
+        57,
+        1000,
+        582
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "02_components/panels/ui_panel_status_pill.png",
+      "size": [
+        1024,
+        384
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 113187,
+      "visible_bbox": [
+        24,
+        38,
+        1000,
+        345
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "03_characters/intern_embarrassed.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 710489,
+      "visible_bbox": [
+        83,
+        48,
+        941,
+        1488
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "03_characters/intern_embarrassed_portrait.png",
+      "size": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 137249,
+      "visible_bbox": [
+        37,
+        24,
+        474,
+        488
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "03_characters/intern_normal_full.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 1138686,
+      "visible_bbox": [
+        267,
+        48,
+        757,
+        1488
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "03_characters/intern_normal_half.png",
+      "size": [
+        1024,
+        1536
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 727537,
+      "visible_bbox": [
+        75,
+        48,
+        948,
+        1488
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "03_characters/intern_normal_portrait.png",
+      "size": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 142707,
+      "visible_bbox": [
+        33,
+        24,
+        479,
+        488
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "03_characters/leader_normal.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 499262,
+      "visible_bbox": [
+        55,
+        48,
+        968,
+        976
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "03_characters/leader_normal_portrait.png",
+      "size": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 131051,
+      "visible_bbox": [
+        24,
+        38,
+        488,
+        474
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "03_characters/leader_satisfied.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 510918,
+      "visible_bbox": [
+        65,
+        48,
+        958,
+        976
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "03_characters/leader_satisfied_portrait.png",
+      "size": [
+        512,
+        512
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 135809,
+      "visible_bbox": [
+        24,
+        38,
+        488,
+        474
+      ],
+      "edge_alpha_pixels": 0
+    },
+    {
+      "file": "04_backgrounds_foregrounds/bg_bbq_landscape.png",
+      "size": [
+        1920,
+        1080
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "04_backgrounds_foregrounds/bg_bbq_portrait.png",
+      "size": [
+        1080,
+        1920
+      ],
+      "mode": "RGB"
+    },
+    {
+      "file": "04_backgrounds_foregrounds/fg_table_empty.png",
+      "size": [
+        1920,
+        1080
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 1133941,
+      "visible_bbox": [
+        0,
+        529,
+        1920,
+        1080
+      ],
+      "edge_alpha_pixels": 2894
+    },
+    {
+      "file": "04_backgrounds_foregrounds/prop_layoff_box.png",
+      "size": [
+        1024,
+        1024
+      ],
+      "mode": "RGBA",
+      "alpha_range": [
+        0,
+        255
+      ],
+      "zero_alpha_pixels": 589766,
+      "visible_bbox": [
+        72,
+        120,
+        952,
+        904
+      ],
+      "edge_alpha_pixels": 0
+    }
+  ]
+}
