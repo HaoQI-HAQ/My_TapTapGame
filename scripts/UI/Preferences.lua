@@ -5,13 +5,19 @@ local Art = require("UI.ArtTheme")
 local C = Art.C
 local Preferences = {}
 local SAVE_PATH = "ui_preferences.json"
+-- 网页预览的文件系统在内存里，刷新即丢；云变量按账号持久，是跨刷新保留偏好的通道。
+local CLOUD_KEY = "jiuzhuo_ui_preferences"
 local SPEEDS = {slow = true, normal = true, fast = true, instant = true}
 local values = {sfxVolume = 80, dialogueSpeed = "normal"}
 local loaded, dirty = false, false
+-- 云变量回包是异步的：未回来前用文件或默认值，回来后只在用户没改过时才覆盖。
+local cloudSettled, cloudFailed = false, false
 ---@type Modal?
 local activeModal = nil
 ---@type Label?
 local statusLabel = nil
+---@type table<number, fun()>
+local listeners = {}
 
 local function Snapshot()
     return {sfxVolume = values.sfxVolume, dialogueSpeed = values.dialogueSpeed}
@@ -29,9 +35,25 @@ local function SetStatus(saved)
     end
 end
 
----@return boolean saved
-local function Save()
-    if not dirty then return true end
+-- 校验来自文件或云变量的存档；非法字段独立回退，不把坏数据交给游戏层。
+---@param data any
+---@return boolean applied
+local function Apply(data)
+    if type(data) ~= "table" then return false end
+    local volume = data.sfxVolume
+    if type(volume) == "number" and volume == volume and volume >= 0 and volume <= 100 then
+        values.sfxVolume = math.floor(volume + 0.5)
+    end
+    if type(data.dialogueSpeed) == "string" and SPEEDS[data.dialogueSpeed] then
+        values.dialogueSpeed = data.dialogueSpeed
+    end
+    ApplyAudio()
+    return true
+end
+
+-- 本机文件写入：网页预览下只存在于内存文件系统，作为云变量不可用时的降级。
+---@return boolean written
+local function SaveLocal()
     ---@type File?
     local file = nil
     local ok, written = pcall(function()
@@ -41,14 +63,67 @@ local function Save()
         return file:WriteString(encoded)
     end)
     if file then file:Dispose() end
-    local saved = ok and written == true
+    return ok and written == true
+end
+
+-- 云变量失败只提示一次，避免每次拖动滑杆都刷日志。
+local function SaveCloud()
+    if cloudFailed or not clientCloud then return end
+    pcall(function()
+        clientCloud:Set(CLOUD_KEY, Snapshot(), {
+            error = function(code, reason)
+                cloudFailed = true
+                print("[Preferences] 云偏好保存失败 " .. tostring(code) .. " " .. tostring(reason))
+            end,
+        })
+    end)
+end
+
+---@return boolean saved
+local function Save()
+    if not dirty then return true end
+    local saved = SaveLocal()
+    SaveCloud()
     if saved then
         dirty = false
     else
-        print("[Preferences] 无法保存 UI 偏好，保留本次会话设置")
+        print("[Preferences] 无法写入本机偏好文件，已提交云偏好")
     end
     SetStatus(saved)
     return saved
+end
+
+local function Notify()
+    for index = #listeners, 1, -1 do
+        local callback = listeners[index]
+        listeners[index] = nil
+        pcall(callback)
+    end
+end
+
+-- 先读本机文件立即生效，再异步取云偏好；用户已改动则不让回包覆盖。
+local function LoadCloud()
+    if not clientCloud then cloudSettled = true; return end
+    local ok = pcall(function()
+        clientCloud:Get(CLOUD_KEY, {
+            ok = function(values_, iscores)
+                cloudSettled = true
+                local data = type(values_) == "table" and values_[CLOUD_KEY] or nil
+                if dirty or type(data) ~= "table" then Notify(); return end
+                if Apply(data) then
+                    print("[Preferences] 已应用云偏好，骰子音量=" .. values.sfxVolume
+                        .. "，对话速度=" .. values.dialogueSpeed)
+                end
+                Notify()
+            end,
+            error = function(code, reason)
+                cloudSettled, cloudFailed = true, true
+                print("[Preferences] 云偏好读取失败 " .. tostring(code) .. " " .. tostring(reason))
+                Notify()
+            end,
+        })
+    end)
+    if not ok then cloudSettled = true end
 end
 
 -- 非法/缺失字段独立回退默认值；不把坏档内容交给游戏层。
@@ -67,19 +142,22 @@ function Preferences.Load()
     end)
     if file then file:Dispose() end
     if ok and type(data) == "table" then
-        local volume = data.sfxVolume
-        if type(volume) == "number" and volume == volume and volume >= 0 and volume <= 100 then
-            values.sfxVolume = math.floor(volume + 0.5)
-        end
-        if type(data.dialogueSpeed) == "string" and SPEEDS[data.dialogueSpeed] then
-            values.dialogueSpeed = data.dialogueSpeed
-        end
+        Apply(data)
     elseif not ok or data ~= nil then
         print("[Preferences] UI 偏好文件损坏，已使用默认设置")
     end
     ApplyAudio()
+    LoadCloud()
     print("[Preferences] 已加载，骰子音量=" .. values.sfxVolume .. "，对话速度=" .. values.dialogueSpeed)
     return Snapshot()
+end
+
+-- 打开设置前调用：等云偏好回来再画控件，避免面板数值和实际生效值不一致。
+---@param callback fun()
+function Preferences.WhenReady(callback)
+    Preferences.Load()
+    if cloudSettled then callback(); return end
+    listeners[#listeners + 1] = callback
 end
 
 ---@param key string "sfxVolume" | "dialogueSpeed"
@@ -218,8 +296,17 @@ end
 
 ---@return Modal? modal Close/CloseAll dismisses and destroys it; do not reuse after close.
 function Preferences.ShowSettings()
-    Preferences.Load()
     if activeModal and activeModal.id == "settings_modal" then return activeModal end
+    -- 等云偏好回来再画，避免面板显示默认值却已按云端值生效。
+    Preferences.WhenReady(function()
+        if activeModal and activeModal.id == "settings_modal" then return end
+        Preferences.ShowSettings_()
+    end)
+    return activeModal
+end
+
+---@return Modal?
+function Preferences.ShowSettings_()
     local modal = CreateModal("settings_modal")
     if not modal then return nil end
     local volumeLabel = Art.Text(tostring(values.sfxVolume) .. "%", 13, C.purple,
@@ -262,7 +349,7 @@ function Preferences.ShowSettings()
     local unit = Art.Unit()
     local content = UI.Panel {width = "100%", paddingRight = 16, gap = 14 * unit, children = {
         Art.Title("桌边偏好", 23, C.purple, {id = "settings_title", width = "100%"}),
-        Art.Text("按自己的节奏入席。网页预览刷新后需重新设置。", 11, C.muted, {width = "100%", fontFamily = "sans"}),
+        Art.Text("按自己的节奏入席。偏好按账号保存，换设备也会保留。", 11, C.muted, {width = "100%", fontFamily = "sans"}),
         UI.Panel {width = "100%", gap = 4, children = {
             UI.Panel {width = "100%", flexDirection = "row", alignItems = "center", children = {
                 Art.Text("骰子音效音量", 14, C.ink,

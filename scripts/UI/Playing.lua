@@ -512,9 +512,10 @@ function Playing.Create(navigate)
         local dieSize = math.min((ready and 40 or (short and 54 or 70)) * unit, stageHeight * 0.38)
         diceRow:SetStyle({left = (layoutW - diceWidth) / 2, width = diceWidth,
             bottom = (ready and 2 or 6) * unit, gap = 4 * unit})
-        tellPanel:SetStyle({width = "38%", height = 48 * unit, padding = 0})
-        tellCaption:SetStyle({lineHeight = 1.1})
-        tellIcon:SetStyle({lineHeight = 1.1})
+        tellPanel:SetStyle({width = "38%", height = 48 * unit, padding = 0, overflow = "hidden"})
+        -- 两行文字在固定高度面板里要允许收缩，否则字号取整后会溢出 1-2px。
+        tellCaption:SetStyle({lineHeight = 1.1, flexShrink = 1})
+        tellIcon:SetStyle({lineHeight = 1.1, flexShrink = 1})
         tellCaption:SetFontSize(Art.FontSize(9))
         tellIcon:SetFontSize(Art.FontSize(12))
         playerResult:SetFontSize(Art.FontSize(10))
