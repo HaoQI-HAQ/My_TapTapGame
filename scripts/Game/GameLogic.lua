@@ -89,19 +89,20 @@ GameLogic.State = {
     totalSpent = 0,
     firstMistakeUsed = false, -- 实习生萌新光环
 
-    -- 猜骰（每回合开局）：双方各1颗，隐藏对方点数，玩家押大/小/相同
+    -- 猜骰（每回合开局）：双方各1颗，隐藏对方点数，玩家选我更大/我更小/一样大
     guess = {
         active = false,        -- 是否处于猜骰阶段
         playerDie = 0,         -- 玩家点数（可见）
         opponentDie = 0,       -- 对手点数（叫开前不可见）
-        opponentChoice = nil,  -- 对手选择 "big"/"small"/"same"（预先亮出）
+        opponentChoice = nil,  -- 对手选择 "big"/"small"/"same"
         playerChoice = nil,    -- 玩家选择
         tellChoice = nil,      -- 对手给出的「预告」（可能为假）
         tellTrue = false,      -- 预告是否为真
         revealed = false,      -- 是否已亮骰
         winner = nil,          -- "player" / "opponent" / nil
-        rerolls = 0,           -- 重摇次数（双方点数相同则重摇）
-        lastTie = false,       -- 上一轮是否因点数相同重摇
+        rerolls = 0,           -- 重摇次数
+        rerollInfo = nil,      -- 上次重摇的快照（reason/dice/choices），供 UI 解释
+        bothHit = false,       -- 本局双方是否都押中（玩家后押占优，仍判玩家赢）
     },
     -- 当日情报（赢得话语权后问得，供次日参考）
     intel = nil,           ---@type table|nil
@@ -714,7 +715,7 @@ function GameLogic.ResetBanquetStats()
     s.specialEvents = {}
     s.guess = { active = false, playerDie = 0, opponentDie = 0, opponentChoice = nil,
         playerChoice = nil, tellChoice = nil, tellTrue = false, revealed = false,
-        winner = nil, rerolls = 0, lastTie = false }
+        winner = nil, rerolls = 0, rerollInfo = nil, bothHit = false }
     return true
 end
 
@@ -767,7 +768,8 @@ function GameLogic.StartGuessRound()
     G.finished = false
     G.active = true
     G.rerolls = 0
-    G.lastTie = false
+    G.rerollInfo = nil
+    G.bothHit = false
     G.winner = nil
     G.playerChoice = nil
     GameLogic.RollGuessDice()
@@ -815,63 +817,55 @@ function GameLogic.GuessTell()
     return pool[math.random(1, #pool)], false
 end
 
---- 玩家选择「大 / 小 / 相同」，随后叫开。
---- 双方点数不同 → 立即分胜负；点数相同 → 重摇并保持可选择状态。
+--- 玩家选择「我更大 / 我更小 / 一样大」，随后叫开亮骰。
+--- 判定原则：
+---   · 玩家押中 → 玩家赢（玩家后押、看过预告，本就占信息优势）
+---   · 玩家没押中、对手押中 → 对手赢
+---   · 双方都没押中（都看走眼）→ 没分出高下，重摇再选
+--- 注意：绝不能因为「谁点数大」就判谁赢 —— 这是猜骰，押错就是押错。
 ---@param choice string
 ---@return boolean, string|nil
 function GameLogic.GuessPick(choice)
     local s = GameLogic.State
     local G = s.guess
     if not G.active or G.winner then return false, "本轮猜骰已经结束" end
-    local valid = false
-    for _, c in ipairs(GameData.GuessDice.choices) do
-        if c.id == choice then valid = true; break end
+    if not GameData.GetGuessChoice(choice) then
+        return false, "只能选「我更大 / 我更小 / 一样大」"
     end
-    if not valid then return false, "只能选「我更大 / 我更小 / 一样大」" end
 
     G.playerChoice = choice
     G.revealed = true
 
-    if G.playerDie == G.opponentDie then
-        -- 点数相同：双方都押「相同」才算命中，否则本轮作废重摇。
-        G.lastTie = true
-        if choice == "same" then
-            G.winner = "player"
-        else
-            local opponentHit = GuessHit(G.opponentChoice, G.opponentDie, G.playerDie)
-            G.winner = opponentHit and "opponent" or nil
-        end
-        if not G.winner then
-            G.rerolls = G.rerolls + 1
-            if G.rerolls >= GameData.GuessDice.maxRerolls then
-                -- 兜底：连续平局太多次，判对手胜，避免死循环
-                G.winner = "opponent"
-                print("[Guess] 重摇次数超限，判对手胜")
-                return true, G.winner
-            end
-            print(string.format("[Guess] 点数相同(%d)且未押中，重摇第%d次", G.playerDie, G.rerolls))
-            GameLogic.RollGuessDice()
-            return true, nil
-        end
-        print(string.format("[Guess] 点数相同(%d) 玩家押=%s 对手押=%s → %s胜",
-            G.playerDie, choice, tostring(G.opponentChoice), G.winner))
-        return true, G.winner
-    end
-
-    -- 点数不同：各自验证自己的选择
     local playerHit = GuessHit(choice, G.playerDie, G.opponentDie)
     local opponentHit = GuessHit(G.opponentChoice, G.opponentDie, G.playerDie)
-    if playerHit and not opponentHit then
+
+    if playerHit then
         G.winner = "player"
-    elseif opponentHit and not playerHit then
+        -- 双方都押中时，记录一下，UI 可解释「他也看准了，但你后押占优」
+        G.bothHit = opponentHit
+    elseif opponentHit then
         G.winner = "opponent"
-    elseif playerHit and opponentHit then
-        -- 理论上不会同时成立（点数不同时大/小互斥），兜底判玩家胜
-        G.winner = "player"
     else
-        -- 双方都没押中：点数大的一方视为占上风
-        G.winner = G.playerDie > G.opponentDie and "player" or "opponent"
+        -- 双方都没押中：都没看准，本局作废重摇
+        G.rerollInfo = {
+            reason = "both_miss",
+            playerDie = G.playerDie, opponentDie = G.opponentDie,
+            playerChoice = choice, opponentChoice = G.opponentChoice,
+        }
+        G.rerolls = G.rerolls + 1
+        if G.rerolls >= GameData.GuessDice.maxRerolls then
+            -- 兜底：连续重摇太多次，判对手胜，避免死循环
+            G.winner = "opponent"
+            G.rerollInfo = nil
+            print("[Guess] 重摇次数超限，判对手胜")
+            return true, G.winner
+        end
+        print(string.format("[Guess] 重摇 玩家=%d/%s 对手=%d/%s 第%d次",
+            G.playerDie, choice, G.opponentDie, tostring(G.opponentChoice), G.rerolls))
+        GameLogic.RollGuessDice()
+        return true, nil
     end
+
     print(string.format("[Guess] 叫开 玩家=%d(%s) 对手=%d(%s) → %s胜",
         G.playerDie, choice, G.opponentDie, tostring(G.opponentChoice), G.winner))
     return true, G.winner

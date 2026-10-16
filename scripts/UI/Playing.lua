@@ -120,15 +120,22 @@ function Playing.Create(navigate)
             if not G or not G.active or G.winner then return end
             local ok, err = GameLogic.GuessPick(choice.id)
             if not ok then UI.Toast.Show(tostring(err), {variant = "warning"}); return end
-            print("[BanquetUI] 玩家押 " .. choice.id)
+            print("[BanquetUI] 玩家选 " .. choice.id)
             if G.winner then
                 Settle()
             else
-                -- 点数相同：延迟一下再重摇，让玩家看清「平局重摇」发生了什么。
-                status:SetText("点数相同，本局作废 —— 重新摇骰，再选一次…")
-                result:SetText("双方都是 " .. G.playerDie .. " 点，平局重摇。")
+                -- 双方都没押中 → 重摇。用快照说清「刚才为什么不算」。
+                local info = G.rerollInfo or {}
+                local mine = info.playerDie or G.playerDie
+                local theirs = info.opponentDie or G.opponentDie
+                local mineChoice = GameData.GuessChoiceLabel(info.playerChoice or choice.id)
+                local hisChoice = GameData.GuessTellLabel(info.opponentChoice or G.opponentChoice)
+                status:SetText("两人都没押中 —— 没分出胜负，重新摇骰再选…")
+                result:SetText("刚才：你 " .. mine .. " 点（" .. mineChoice ..
+                    "） · 他 " .. theirs .. " 点（" .. hisChoice .. "）" ..
+                    "\n两人都没押中，本局作废。")
                 result:Show()
-                rerollDelay = 1.1
+                rerollDelay = 1.2
                 RefreshActions()
             end
         end, true,
@@ -273,7 +280,9 @@ function Playing.Create(navigate)
         result:SetText("揭晓：你 " .. mine .. " 点 · 他 " .. theirs .. " 点" ..
             "\n你押「" .. GameData.GuessChoiceLabel(G.playerChoice) ..
             "」 · 他押「" .. GameData.GuessTellLabel(G.opponentChoice) .. "」" ..
-            "\n" .. relation .. " —— " .. (won and "你赢了这一手。" or "这一手你输了。"))
+            "\n" .. relation ..
+            (won and (G.bothHit and " —— 他也押中了，但你后押占优，你赢。" or " —— 你赢了这一手。")
+                or " —— 这一手你输了。"))
         result:Show()
         hiddenCup:Hide()
         opponentDice:Show()
