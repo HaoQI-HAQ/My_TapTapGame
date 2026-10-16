@@ -1,6 +1,7 @@
 -- 图纸感视觉小说主题：资源清单、纸片组件与安全区响应式布局。
 -- 路径为资源根相对路径；保留完整字面量，供构建器扫描引用。
 local UI = require("urhox-libs/UI")
+local GameData = require("Data.GameData")
 local Art = {}
 Art.C = {
     paper = {244, 239, 229, 255}, white = {255, 252, 245, 255},
@@ -234,8 +235,11 @@ function Art.Stats(state, compact)
 end
 
 function Art.HUD(state, levelName)
+    local mode = GameData and GameData.GetMode and GameData.GetMode(state.mode) or nil
+    local modeLabel = mode and (mode.icon .. " " .. mode.name) or "💼 上班咯"
     local children = {
-        Art.Text("DAY " .. state.currentDay .. " / " .. state.maxDays, 11, C.yellow, {width = 88}),
+        Art.Text(modeLabel, 10, C.yellow, {width = 86, whiteSpace = "nowrap"}),
+        Art.Text("DAY " .. state.currentDay .. " / " .. state.maxDays, 11, C.yellow, {width = 78}),
         UI.Panel {width = 165, flexDirection = "row", gap = 4, alignItems = "center", children = {
             Art.Badge(state.currentLevel, 24), Art.Text("Lv." .. state.currentLevel .. " " .. levelName, 10, C.white,
                 {flexGrow = 1, flexBasis = 0, flexShrink = 1, whiteSpace = "nowrap"})}},

@@ -1,6 +1,6 @@
 -- ============================================================================
--- 《酒桌文化》v1.2.1 核心游戏逻辑
--- 5天循环 / 职级晋升 / 休息日 / 区域老板双局制 / 结算判定
+-- 《酒桌文化》v1.3.0 核心游戏逻辑
+-- 双模式(上班咯/下班咯) / 5天循环 / 职级晋升 / 休息日 / 区域老板双局制 / 结算判定
 -- ============================================================================
 
 local GameData = require("Data.GameData")
@@ -11,6 +11,9 @@ local GameLogic = {}
 -- 游戏状态
 -- ============================================================================
 GameLogic.State = {
+    -- 游戏模式：onwork 上班咯 / offwork 下班咯（开局选定，整局不变）
+    mode = "onwork",    ---@type string
+
     -- 开局选择（一旦选定整局不变）
     workplace = nil,    ---@type table|nil
     character = nil,    ---@type table|nil
@@ -39,9 +42,9 @@ GameLogic.State = {
     hiddenBossTriggered = false, -- 本局是否已触发普老板
     hiddenTriggerReason = "",    -- 触发原因（用于登场文案变体）
     -- 街机乱入挑战者（普老板）相关
-    liarWinStreak = 0,       -- 大话骰连胜天数
-    liarMaxStreak = 0,       -- 最高连胜
-    liarTotalWins = 0,       -- 大话骰总胜场
+    guessWinStreak = 0,      -- 猜骰连胜天数
+    guessMaxStreak = 0,      -- 最高连胜
+    guessTotalWins = 0,      -- 猜骰总胜场
     challengerDefeated = false, -- 是否击败过乱入挑战者
     challengerReward = nil,  ---@type table|nil 击败奖励记录
     -- 乱入判定：每局只掷一次，避免随天数累积导致触发率失控
@@ -79,8 +82,6 @@ GameLogic.State = {
     -- 回合状态
     round = 0,
     maxRounds = 8,
-    playerDice = 0,
-    opponentDice = 0,
     currentEvent = nil,     ---@type table|nil
     eventHistory = {},
     usedSkillToday = false,
@@ -88,16 +89,19 @@ GameLogic.State = {
     totalSpent = 0,
     firstMistakeUsed = false, -- 实习生萌新光环
 
-    -- 大话骰（每回合开局）：双方各1颗，隐藏对方点数，轮流加码或叫开
-    liar = {
-        active = false,        -- 是否处于大话骰阶段
-        playerDie = 0,         -- 玩家点数（隐藏）
-        opponentDie = 0,       -- 对手点数（玩家不可见）
-        currentBid = 0,        -- 当前叫的点数
-        turn = "player",       -- 当前行动方 "player" / "opponent"
-        revealOpponent = false,-- 是否已亮出对手点数
+    -- 猜骰（每回合开局）：双方各1颗，隐藏对方点数，玩家押大/小/相同
+    guess = {
+        active = false,        -- 是否处于猜骰阶段
+        playerDie = 0,         -- 玩家点数（可见）
+        opponentDie = 0,       -- 对手点数（叫开前不可见）
+        opponentChoice = nil,  -- 对手选择 "big"/"small"/"same"（预先亮出）
+        playerChoice = nil,    -- 玩家选择
+        tellChoice = nil,      -- 对手给出的「预告」（可能为假）
+        tellTrue = false,      -- 预告是否为真
+        revealed = false,      -- 是否已亮骰
         winner = nil,          -- "player" / "opponent" / nil
-        rounds = 0,            -- 加码次数，防死循环
+        rerolls = 0,           -- 重摇次数（双方点数相同则重摇）
+        lastTie = false,       -- 上一轮是否因点数相同重摇
     },
     -- 当日情报（赢得话语权后问得，供次日参考）
     intel = nil,           ---@type table|nil
@@ -135,6 +139,7 @@ GameLogic.State = {
 -- ============================================================================
 function GameLogic.Reset()
     local s = GameLogic.State
+    s.mode = "onwork"
     s.workplace = nil
     s.character = nil
     s.restaurant = nil
@@ -156,9 +161,9 @@ function GameLogic.Reset()
     s.quitTalkUsed = false
     s.hiddenBossTriggered = false
     s.hiddenTriggerReason = ""
-    s.liarWinStreak = 0
-    s.liarMaxStreak = 0
-    s.liarTotalWins = 0
+    s.guessWinStreak = 0
+    s.guessMaxStreak = 0
+    s.guessTotalWins = 0
     s.challengerDefeated = false
     s.challengerReward = nil
     s.challengerRolled = false
@@ -198,8 +203,6 @@ function GameLogic.Reset()
     s.pro = 0
     s.round = 0
     s.maxRounds = 8
-    s.playerDice = 0
-    s.opponentDice = 0
     s.currentEvent = nil
     s.eventHistory = {}
     s.usedSkillToday = false
@@ -214,9 +217,29 @@ end
 -- ============================================================================
 -- 开局选择
 -- ============================================================================
+--- 从主菜单点「开始入职」：先选模式，再选职场环境。
 function GameLogic.StartNewGame()
     GameLogic.Reset()
-    GameLogic.State.phase = "select_workplace"
+    GameLogic.State.phase = "select_mode"
+end
+
+--- 选定模式（上班咯 / 下班咯），整局有效。
+---@param modeId string
+---@return boolean, string|nil
+function GameLogic.SelectMode(modeId)
+    local s = GameLogic.State
+    if s.phase ~= "select_mode" then return false, "当前不是选模式阶段" end
+    local mode = GameData.GetMode(modeId)
+    if not mode or mode.id ~= modeId then return false, "未知的游戏模式" end
+    s.mode = mode.id
+    s.phase = "select_workplace"
+    print(string.format("[Mode] 选定模式 = %s（%s）", mode.id, mode.name))
+    return true
+end
+
+--- 当前模式配置。
+function GameLogic.GetMode()
+    return GameData.GetMode(GameLogic.State.mode)
 end
 
 function GameLogic.SelectWorkplace(workplace)
@@ -424,8 +447,8 @@ function GameLogic.CheckHiddenBossTrigger()
     -- 2 天局（区域老板）用一半阈值，保证条件可达
     local short = s.maxDays <= 2
 
-    -- C1 骰神附体：大话骰连胜（5天局3天 / 2天局2天）—— 太顺了，有人想试试你
-    if s.liarWinStreak >= (short and 2 or 3) then
+    -- C1 骰神附体：猜骰连胜（5天局3天 / 2天局2天）—— 太顺了，有人想试试你
+    if s.guessWinStreak >= (short and 2 or 3) then
         return true, "C1"
     end
     -- C2 廉酒识人：二锅头≥2 且 尊严峰值≥70 —— 有性格，引起注意
@@ -452,16 +475,16 @@ function GameLogic.CheckHiddenBossTrigger()
     return false, ""
 end
 
---- 每场酒局后更新连胜/总胜场（在 LiarFinish 之后调用）
+--- 每场酒局后更新连胜/总胜场（在 GuessFinish 之后调用）
 ---@param winner string
-function GameLogic.RecordLiarOutcome(winner)
+function GameLogic.RecordGuessOutcome(winner)
     local s = GameLogic.State
     if winner == "player" then
-        s.liarWinStreak = s.liarWinStreak + 1
-        s.liarTotalWins = s.liarTotalWins + 1
-        s.liarMaxStreak = math.max(s.liarMaxStreak, s.liarWinStreak)
+        s.guessWinStreak = s.guessWinStreak + 1
+        s.guessTotalWins = s.guessTotalWins + 1
+        s.guessMaxStreak = math.max(s.guessMaxStreak, s.guessWinStreak)
     else
-        s.liarWinStreak = 0
+        s.guessWinStreak = 0
     end
 end
 
@@ -670,8 +693,6 @@ function GameLogic.ResetBanquetStats()
     s.pro = 0
     s.round = 0
     s.maxRounds = math.random(6, 10)
-    s.playerDice = 0
-    s.opponentDice = 0
     s.eventHistory = {}
     s.usedSkillToday = false
     s.drinkCount = 0
@@ -691,184 +712,211 @@ function GameLogic.ResetBanquetStats()
     s.quitInDrunk = false
     s.bonusRounds = 0
     s.specialEvents = {}
-    s.liar = { active = false, playerDie = 0, opponentDie = 0, currentBid = 0,
-        turn = "player", revealOpponent = false, winner = nil, rounds = 0 }
+    s.guess = { active = false, playerDie = 0, opponentDie = 0, opponentChoice = nil,
+        playerChoice = nil, tellChoice = nil, tellTrue = false, revealed = false,
+        winner = nil, rerolls = 0, lastTie = false }
     return true
 end
 
 -- ============================================================================
--- 大话骰（总和制）
--- 双方各 1 颗骰。玩家可见自己的点数，对手点数隐藏。
--- 叫价 = 猜测「双方骰子总和」（范围 2-12）。轮流行动：加码或叫开。
--- 叫开判定：叫价 > 实际总和 → 叫开者赢（上家虚报）；否则叫开者输。
+-- 猜骰（比大小）
+-- 双方各 1 颗骰。玩家看得见自己的点数，看不见对方的。
+-- 流程：对手先选（选择预先亮出）→ 玩家押「大 / 小 / 相同」→ 叫开亮骰
+--   · 双方点数不同 → 直接比点数大小，押对者赢
+--   · 双方点数相同 → 本局作废，重摇一颗再选，直到分出胜负
 -- ============================================================================
 
---- 开始一回合的大话骰
-function GameLogic.StartLiarRound()
-    local s = GameLogic.State
-    local L = s.liar
-    -- 标记随 liar 表一起重置；同一事件重建界面时保留骰子、行动进度和结算结果。
-    if L.banquetToken == s.banquetId and L.roundToken == s.round and L.eventToken == s.currentEvent then
-        return L
+--- 判定「大 / 小 / 相同」是否猜中（点数不同时的比大小规则）。
+---@param choice string "big" / "small" / "same"
+---@param playerDie number
+---@param opponentDie number
+---@return boolean
+local function GuessHit(choice, playerDie, opponentDie)
+    if playerDie == opponentDie then return choice == "same" end
+    if choice == "big" then return playerDie > opponentDie end
+    if choice == "small" then return playerDie < opponentDie end
+    return false -- 点数不同时押「相同」必输
+end
+
+--- 按对手性格加权随机选一个选项。
+---@param personality string|nil
+---@return string
+local function PickOpponentChoice(personality)
+    local cfg = GameData.GuessDice
+    local bias = cfg.personalityBias[personality or ""] or cfg.personalityBias.vain
+    local roll = math.random()
+    local acc = 0
+    for _, choice in ipairs(cfg.choices) do
+        acc = acc + (bias[choice.id] or 0)
+        if roll <= acc then return choice.id end
     end
-    L.banquetToken = s.banquetId
-    L.roundToken = s.round
-    L.eventToken = s.currentEvent
-    L.finished = false
-    s.liar.active = true
-    s.liar.playerDie = math.random(1, 6)
-    s.liar.opponentDie = math.random(1, 6)
+    return "big"
+end
+
+--- 开始一回合的猜骰。
+function GameLogic.StartGuessRound()
+    local s = GameLogic.State
+    local G = s.guess
+    -- 标记随 guess 表一起重置；同一事件重建界面时保留骰子、选择与结算结果。
+    if G.banquetToken == s.banquetId and G.roundToken == s.round and G.eventToken == s.currentEvent then
+        return G
+    end
+    G.banquetToken = s.banquetId
+    G.roundToken = s.round
+    G.eventToken = s.currentEvent
+    G.finished = false
+    G.active = true
+    G.rerolls = 0
+    G.lastTie = false
+    G.winner = nil
+    G.playerChoice = nil
+    GameLogic.RollGuessDice()
+    return G
+end
+
+--- 摇两颗骰（含面子/酒友加成），并让对手先亮出选择。
+function GameLogic.RollGuessDice()
+    local s = GameLogic.State
+    local G = s.guess
+    G.playerDie = math.random(1, 6)
+    G.opponentDie = math.random(1, 6)
     -- 面子值加成：高面子时有概率让玩家骰子更好
     if s.face > 20 and math.random() < 0.2 then
-        s.liar.playerDie = math.min(6, s.liar.playerDie + 1)
+        G.playerDie = math.min(6, G.playerDie + 1)
     end
     -- 成为酒友奖励：骰子永久 +1（整局有效）
     if s.diceBonus > 0 then
-        s.liar.playerDie = math.min(6, s.liar.playerDie + s.diceBonus)
-        print(string.format("[Liar] 酒友加成 +%d", s.diceBonus))
+        G.playerDie = math.min(6, G.playerDie + s.diceBonus)
+        print(string.format("[Guess] 酒友加成 +%d", s.diceBonus))
     end
-    s.liar.currentBid = 0
-    s.liar.turn = "player"
-    s.liar.revealOpponent = false
-    s.liar.winner = nil
-    s.liar.rounds = 0
-    print(string.format("[Liar] 开局 玩家骰=%d 对手骰=%d 总和=%d",
-        s.liar.playerDie, s.liar.opponentDie, s.liar.playerDie + s.liar.opponentDie))
-    return s.liar
+    G.opponentChoice = PickOpponentChoice(s.opponentPersonality)
+    G.revealed = false
+    G.playerChoice = nil
+    print(string.format("[Guess] 摇骰 玩家=%d 对手=%d 对手选择=%s",
+        G.playerDie, G.opponentDie, tostring(G.opponentChoice)))
+    return G
 end
 
---- 双方骰子实际总和
-function GameLogic.LiarActualSum()
-    local L = GameLogic.State.liar
-    return L.playerDie + L.opponentDie
-end
-
---- 叫价上限：双方总和最大值 12
-function GameLogic.LiarMaxBid()
-    return 12
-end
-
---- 玩家加码：叫一个比当前更大的总和数（2-12）
-function GameLogic.LiarRaise(bid)
+--- 对手选择的「预告」：越直爽的性格越容易被看穿，越精明越会藏。
+--- 返回预告选项与是否为真话。
+---@return string, boolean
+function GameLogic.GuessTell()
     local s = GameLogic.State
-    local L = s.liar
-    if not L.active or L.turn ~= "player" then return false, "现在不是你的回合" end
-    -- 先验证类型及有限整数范围，避免比较或 %d 格式化非法输入时崩溃。
-    if type(bid) ~= "number" or bid ~= bid or bid < 2 or bid > 12 or bid % 1 ~= 0 then
-        return false, "叫价必须是 2 到 12 之间的有限整数"
+    local G = s.guess
+    local cfg = GameData.GuessDice
+    local actual = G.opponentChoice or "big"
+    local accuracy = cfg.tellAccuracy[s.opponentPersonality or ""] or 0.5
+    if math.random() < accuracy then return actual, true end
+    -- 说谎：随机换一个别的选项
+    local pool = {}
+    for _, choice in ipairs(cfg.choices) do
+        if choice.id ~= actual then pool[#pool + 1] = choice.id end
     end
-    local minBid = math.max(2, L.currentBid + 1)
-    if bid < minBid then
-        return false, string.format("只能叫 %d 到 12 之间", minBid)
-    end
-    L.currentBid = bid
-    L.rounds = L.rounds + 1
-    L.turn = "opponent"
-    print(string.format("[Liar] 玩家叫 → %d", bid))
-    return true
+    return pool[math.random(1, #pool)], false
 end
 
---- 玩家叫开：要求亮骰，比较叫价与实际总和
-function GameLogic.LiarChallenge()
+--- 玩家选择「大 / 小 / 相同」，随后叫开。
+--- 双方点数不同 → 立即分胜负；点数相同 → 重摇并保持可选择状态。
+---@param choice string
+---@return boolean, string|nil
+function GameLogic.GuessPick(choice)
     local s = GameLogic.State
-    local L = s.liar
-    if not L.active or L.turn ~= "player" then return false, "现在不是你的回合" end
-    if L.currentBid == 0 then return false, "还没人叫价，不能叫开" end
-    local sum = L.playerDie + L.opponentDie
-    -- 叫价 > 实际总和 → 上家虚报 → 叫开者赢
-    local opponentBluffed = L.currentBid > sum
-    L.revealOpponent = true
-    L.winner = opponentBluffed and "player" or "opponent"
-    L.active = false
-    print(string.format("[Liar] 玩家叫开 叫价=%d 总和=%d → %s胜",
-        L.currentBid, sum, L.winner == "player" and "玩家" or "对手"))
-    return true, L.winner
-end
+    local G = s.guess
+    if not G.active or G.winner then return false, "本轮猜骰已经结束" end
+    local valid = false
+    for _, c in ipairs(GameData.GuessDice.choices) do
+        if c.id == choice then valid = true; break end
+    end
+    if not valid then return false, "只能押大、小或相同" end
 
---- 对手行动（AI）：加码或叫开。返回 action, bid
-function GameLogic.LiarOpponentTurn()
-    local s = GameLogic.State
-    local L = s.liar
-    if not L.active or L.turn ~= "opponent" then return nil end
+    G.playerChoice = choice
+    G.revealed = true
 
-    local cfg = GameData.LiarsDice
-    local sum = L.playerDie + L.opponentDie
-    -- 对手知道自己骰子，估算玩家平均 3.5
-    local estimatedSum = L.opponentDie + 3.5
-    -- 叫价已超出估算 → 倾向叫开
-    local shouldChallenge = L.currentBid >= estimatedSum and math.random() < cfg.aiChallengeChance
-    -- 加码轮数兜底，避免死循环
-    if L.rounds >= 5 then shouldChallenge = true end
-
-    if shouldChallenge then
-        local playerBluffed = L.currentBid > sum
-        L.revealOpponent = true
-        L.winner = playerBluffed and "opponent" or "player"
-        L.active = false
-        print(string.format("[Liar] 对手叫开 叫价=%d 总和=%d → %s胜",
-            L.currentBid, sum, L.winner == "player" and "玩家" or "对手"))
-        return "challenge", L.currentBid
+    if G.playerDie == G.opponentDie then
+        -- 点数相同：双方都押「相同」才算命中，否则本轮作废重摇。
+        G.lastTie = true
+        if choice == "same" then
+            G.winner = "player"
+        else
+            local opponentHit = GuessHit(G.opponentChoice, G.opponentDie, G.playerDie)
+            G.winner = opponentHit and "opponent" or nil
+        end
+        if not G.winner then
+            G.rerolls = G.rerolls + 1
+            if G.rerolls >= GameData.GuessDice.maxRerolls then
+                -- 兜底：连续平局太多次，判对手胜，避免死循环
+                G.winner = "opponent"
+                print("[Guess] 重摇次数超限，判对手胜")
+                return true, G.winner
+            end
+            print(string.format("[Guess] 点数相同(%d)且未押中，重摇第%d次", G.playerDie, G.rerolls))
+            GameLogic.RollGuessDice()
+            return true, nil
+        end
+        print(string.format("[Guess] 点数相同(%d) 玩家押=%s 对手押=%s → %s胜",
+            G.playerDie, choice, tostring(G.opponentChoice), G.winner))
+        return true, G.winner
     end
 
-    -- 加码：往上叫 1-2 点，偶尔虚张声势
-    local nextBid = L.currentBid + math.random(1, 2)
-    if nextBid > 12 then
-        -- 无法再加，只能叫开
-        local playerBluffed = L.currentBid > sum
-        L.revealOpponent = true
-        L.winner = playerBluffed and "opponent" or "player"
-        L.active = false
-        return "challenge", L.currentBid
-    end
-    L.currentBid = nextBid
-    L.rounds = L.rounds + 1
-    L.turn = "player"
-    print(string.format("[Liar] 对手叫 → %d", nextBid))
-    return "raise", nextBid
-end
-
---- 结束大话骰，返回赢家。玩家赢 → 获得话语权（问情报）
-function GameLogic.LiarFinish()
-    local s = GameLogic.State
-    local L = s.liar
-    local winner = L.winner
-    if winner ~= "player" and winner ~= "opponent" then return nil, "大话骰尚未产生赢家" end
-    if L.finished then return winner end
-    -- 先标记再应用奖励/统计，重复调用或结算重入均不能再次生效。
-    L.finished = true
-    if winner == "player" then
-        s.favor = math.min(100, s.favor + 5)
-        print("[Liar] 玩家赢得话语权，好感+5")
+    -- 点数不同：各自验证自己的选择
+    local playerHit = GuessHit(choice, G.playerDie, G.opponentDie)
+    local opponentHit = GuessHit(G.opponentChoice, G.opponentDie, G.playerDie)
+    if playerHit and not opponentHit then
+        G.winner = "player"
+    elseif opponentHit and not playerHit then
+        G.winner = "opponent"
+    elseif playerHit and opponentHit then
+        -- 理论上不会同时成立（点数不同时大/小互斥），兜底判玩家胜
+        G.winner = "player"
     else
-        s.favor = math.max(0, s.favor - 3)
-        print("[Liar] 玩家失去话语权，好感-3")
+        -- 双方都没押中：点数大的一方视为占上风
+        G.winner = G.playerDie > G.opponentDie and "player" or "opponent"
+    end
+    print(string.format("[Guess] 叫开 玩家=%d(%s) 对手=%d(%s) → %s胜",
+        G.playerDie, choice, G.opponentDie, tostring(G.opponentChoice), G.winner))
+    return true, G.winner
+end
+
+--- 结束猜骰，返回赢家。玩家赢 → 获得话语权（问情报）。
+function GameLogic.GuessFinish()
+    local s = GameLogic.State
+    local G = s.guess
+    local winner = G.winner
+    if winner ~= "player" and winner ~= "opponent" then return nil, "猜骰尚未产生赢家" end
+    if G.finished then return winner end
+    -- 先标记再应用奖励/统计，重复调用或结算重入均不能再次生效。
+    G.finished = true
+    -- 模式差异：上班咯赢在人情，下班咯赢在气势。
+    local isOffwork = s.mode == "offwork"
+    if winner == "player" then
+        if isOffwork then
+            s.dignity = math.min(100, s.dignity + 5)
+            print("[Guess] 玩家赢得话语权（下班咯），骨气+5")
+        else
+            s.favor = math.min(100, s.favor + 5)
+            print("[Guess] 玩家赢得话语权（上班咯），好感+5")
+        end
+    else
+        if isOffwork then
+            s.dignity = math.max(0, s.dignity - 3)
+            print("[Guess] 玩家失去话语权（下班咯），骨气-3")
+        else
+            s.favor = math.max(0, s.favor - 3)
+            print("[Guess] 玩家失去话语权（上班咯），好感-3")
+        end
     end
     -- 连胜统计：影响普老板乱入条件 C1
-    GameLogic.RecordLiarOutcome(winner)
+    GameLogic.RecordGuessOutcome(winner)
     return winner
 end
 
---- 兼容旧接口：直接返回大话骰结果（player 赢 = advantage）
-function GameLogic.RollDice()
-    local s = GameLogic.State
-    if s.phase ~= "playing" or s.currentEvent then return s.playerDice, s.opponentDice end
-    s.playerDice = math.random(1, 6)
-    s.opponentDice = math.random(1, 6)
-    if s.face > 20 and math.random() < 0.2 then
-        s.playerDice = math.min(6, s.playerDice + 1)
-    end
-    return s.playerDice, s.opponentDice
-end
-
+--- 兼容旧接口：直接返回猜骰结果（player 赢 = advantage）
+--- 事件筛选用它决定「平局时优先触发干杯事件」，因此必须反映本轮真实点数。
 function GameLogic.GetDiceResult()
-    local s = GameLogic.State
-    if s.playerDice == s.opponentDice then
-        return "tie"
-    elseif s.playerDice > s.opponentDice then
-        return "advantage"
-    else
-        return "passive"
-    end
+    local G = GameLogic.State.guess
+    if not G or G.playerDie <= 0 or G.opponentDie <= 0 then return "tie" end
+    if G.playerDie == G.opponentDie then return "tie" end
+    return G.playerDie > G.opponentDie and "advantage" or "passive"
 end
 
 -- ============================================================================
@@ -1193,6 +1241,15 @@ function GameLogic.MakeChoice(choiceIndex, eventId, round)
     end
     s.lastChoiceChanges = changes
     s.lastChoiceFeedback = "上一回合：" .. choice.text .. "；" .. (#parts > 0 and table.concat(parts, "、") or "属性无变化") .. skillMessage
+    -- 模式反馈：下班咯里怼人加分、舔人扣分，给玩家即时的爽感/警告。
+    if s.mode == "offwork" then
+        local dignityDelta = changes.dignity or 0
+        if dignityDelta >= 5 then
+            s.lastChoiceFeedback = s.lastChoiceFeedback .. "；【下班咯】这话够硬气，骨气+" .. dignityDelta
+        elseif dignityDelta <= -5 then
+            s.lastChoiceFeedback = s.lastChoiceFeedback .. "；【下班咯】太怂了，骨气" .. dignityDelta
+        end
+    end
     if s.opponent and s.opponent.isBoss and event.type == "final" then
         s.lastChoiceFeedback = s.lastChoiceFeedback .. (s.bossApproved and "；普老板认可你的责任承诺" or "；普老板未认可这份回答")
     end
@@ -1274,17 +1331,38 @@ end
 -- 单日结算
 -- ============================================================================
 
---- 纯数值评分，保留既有权重；可直接在独立Lua环境测试。
+--- 纯数值评分，按模式切换主导权重；可直接在独立Lua环境测试。
+--- 上班咯：好感主导（会做人）。下班咯：骨气(尊严)主导（敢怼人）。
 function GameLogic.GetBanquetScore()
     local s = GameLogic.State
-    -- KTV 续场（氛围满+清醒>50）触发时，好感贡献 ×1.5
-    local favorWeight = s.bonusRounds > 0 and 0.35 * 1.5 or 0.35
-    return s.favor * favorWeight + s.face * 0.2 + s.pro * 0.15 + s.vibe * 0.15
+    local rule = GameData.GetPromotionRule(s.mode)
+    -- KTV 续场（氛围满+清醒>50）触发时，主导项贡献 ×1.5
+    local driverBonus = s.bonusRounds > 0 and 1.5 or 1
+    local driver = s.mode == "offwork" and s.dignity or s.favor
+    local other = s.mode == "offwork" and s.favor or s.dignity
+    local driverWeight = (s.mode == "offwork" and rule.dignityWeight or rule.favorWeight) * driverBonus
+    local otherWeight = s.mode == "offwork" and rule.favorWeight or rule.dignityWeight
+    return driver * driverWeight + other * otherWeight + s.face * rule.faceWeight
+        + s.vibe * rule.vibeWeight + s.pro * rule.proWeight
         + (s.sober / 100) * 15 - s.currentLevel * 3
 end
 
 function GameLogic.GetPromotionThreshold()
-    return GameData.PromotionRules.scoreThresholds[GameLogic.State.currentLevel] or 55
+    local s = GameLogic.State
+    local rule = GameData.GetPromotionRule(s.mode)
+    return rule.scoreThresholds[s.currentLevel] or 55
+end
+
+--- 当前模式的主导属性值（上班咯=好感 / 下班咯=骨气）。
+function GameLogic.GetDriverValue()
+    local s = GameLogic.State
+    return s.mode == "offwork" and s.dignity or s.favor
+end
+
+--- 当前模式的主导属性显示名。
+function GameLogic.GetDriverLabel()
+    return GameData.GetPromotionRule(GameLogic.State.mode).driverLabel
+        or (GameLogic.State.mode == "offwork" and "骨气" or "好感")
 end
 
 --- 判定本场酒局结果: "promote" / "maintain" / "demote" / "optimized"
@@ -1311,10 +1389,13 @@ end
 function GameLogic.GetPromotionSteps()
     local s = GameLogic.State
     if s.character and s.character.isRegionalBoss then return 1 end
-    local rule = GameData.PromotionRules
-    if GameLogic.GetBanquetScore() >= GameLogic.GetPromotionThreshold() and s.favor >= rule.minFavor
-        and s.sober >= rule.minSober and s.dignity >= rule.minDignity and s.pro >= rule.minPro then
-        return rule.exceptionalLevels
+    local rule = GameData.GetPromotionRule(s.mode)
+    if GameLogic.GetBanquetScore() >= GameLogic.GetPromotionThreshold()
+        and GameLogic.GetDriverValue() >= rule.minDriver
+        and s.sober >= GameData.PromotionRules.minSober
+        and s.dignity >= rule.minDignity
+        and s.pro >= GameData.PromotionRules.minPro then
+        return GameData.PromotionRules.exceptionalLevels
     end
     return 1
 end
@@ -1385,7 +1466,7 @@ function GameLogic.ApplyBanquetResult(result, banquetId)
         banquetId = id, day = s.currentDay, result = result,
         levelBefore = levelBefore, levelAfter = s.currentLevel,
         score = score, promotionThreshold = promotionThreshold, promotionSteps = s.currentLevel - levelBefore,
-        promotionReason = promotionSteps > 1 and GameData.PromotionRules.description or "",
+        promotionReason = promotionSteps > 1 and GameData.GetPromotionRule(s.mode).description or "",
         opponentId = s.opponent and s.opponent.id or "",
         challenger = s.opponent ~= nil and s.opponent.isBoss == true,
         challengerDefeated = beatChallenger,
@@ -1397,7 +1478,7 @@ function GameLogic.ApplyBanquetResult(result, banquetId)
     table.insert(s.dayHistory, record)
     print(string.format("[Result] banquet=%d result=%s score=%.2f Lv.%d->%d bossDefeated=%s",
         id, result, score, levelBefore, s.currentLevel, tostring(s.bossDefeated)))
-    if promotionSteps > 1 then print("[Promotion] " .. GameData.PromotionRules.description) end
+    if promotionSteps > 1 then print("[Promotion] " .. GameData.GetPromotionRule(s.mode).description) end
     return true, record
 end
 

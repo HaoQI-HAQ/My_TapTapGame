@@ -110,12 +110,41 @@ function Screens.CreateMainMenu()
     return MainMenu.Create(function()
         resultCache = {}
         GameLogic.StartNewGame()
-        Navigate("select_workplace")
+        Navigate("select_mode")
     end, function()
         Navigate("art_gallery")
     end, function()
         Navigate("dice_demo")
     end)
+end
+
+-- 模式选择：同一套流程，两种升职哲学。选完才进入职场环境选择。
+function Screens.CreateModeSelect()
+    local cards = {}
+    for _, mode in ipairs(GameData.Modes) do
+        local accent = mode.id == "offwork" and C.red or C.purple
+        local badge = mode.id == "offwork" and "🍻 解压" or "💼 标准"
+        cards[#cards + 1] = Art.Paper({
+            UI.Panel {width = "100%", flexDirection = "row", alignItems = "center", gap = 12, children = {
+                Art.Title(mode.icon, 40, C.ink, {width = 56, textAlign = "center"}),
+                UI.Panel {flexGrow = 1, flexBasis = 0, flexShrink = 1, minWidth = 0, gap = 5, children = {
+                    Art.Title(mode.name, 28, C.ink, {width = "100%"}),
+                    Art.Text(mode.tagline, 14, accent, {width = "100%", fontWeight = "bold"}),
+                }},
+                Art.Text(badge, 11, C.white, {backgroundColor = accent, paddingHorizontal = 8,
+                    paddingVertical = 4, borderRadius = 6, whiteSpace = "nowrap"}),
+            }},
+            UI.Panel {width = "100%", height = 1, backgroundColor = C.line},
+            Art.Text(mode.desc, 13, C.muted, {width = "100%", lineHeight = 1.7}),
+            Art.Button("选择「" .. mode.name .. "」→", function()
+                local ok, err = GameLogic.SelectMode(mode.id)
+                if ok == false then UI.Toast.Show(tostring(err or "无法选择该模式"), {variant = "warning"}); return end
+                Navigate(GameLogic.State.phase or "select_workplace")
+            end, mode.id ~= "onwork", {width = "100%", minHeight = 52, id = "mode_" .. mode.id}),
+        }, {padding = 22, gap = 14, minWidth = 0})
+    end
+    return Sheet("今晚，以什么心态入席？", "两种模式共用同一套流程，但「什么算表现好」完全不同。",
+        {UI.SimpleGrid {width = "100%", minColumnWidth = 380, gap = 18, children = cards}})
 end
 
 local workplaceScenes = {internet = "craftbeer", state = "biz_chinese", realestate = "dapaidang",
@@ -335,7 +364,11 @@ function Screens.CreateDayStart()
         UI.Panel {width = "100%", flexDirection = "row", flexWrap = "wrap", gap = 10, children = {
             Metric("可用预算", "¥" .. s.money),
             Metric("被优化次数", s.optimizeCount .. " / " .. s.maxOptimize, s.optimizeCount > 0 and C.red or C.purple),
+            Metric("当前模式", GameLogic.GetMode().name, C.purple),
         }},
+        Art.Text(GameLogic.GetMode().id == "offwork"
+            and "下班咯：越有骨气越升职 —— 该怼就怼，别客气。"
+            or "上班咯：高情商优先 —— 好感决定你的天花板。", 13, C.muted, {width = "100%"}),
         Art.Text("选好场地、酒水与菜品，再开始今天的饭局。", 13, C.muted, {width = "100%"}),
     }
     -- 昨日情报只读展示，为今日选酒、选菜与场地提供参考。

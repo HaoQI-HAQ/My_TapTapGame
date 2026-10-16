@@ -1,9 +1,43 @@
 -- ============================================================================
--- 《酒桌文化》v1.2.1 数据层
--- 职级系统 / 角色(含起始职级) / 场景Tier解锁 / 酒水 / 对话事件
+-- 《酒桌文化》v1.3.0 数据层
+-- 双模式 / 职级系统 / 角色(含起始职级) / 场景Tier解锁 / 酒水 / 对话事件
 -- ============================================================================
 
 local GameData = {}
+
+-- ============================================================================
+-- 游戏模式：同一套流程，两种完全不同的「升职哲学」
+-- ============================================================================
+-- onwork 上班咯：好感主导。高情商、会做人，说错话就掉职级。
+-- offwork 下班咯：尊严主导。越敢怼、越有骨气越升职，唯唯诺诺反被优化。
+GameData.Modes = {
+    {
+        id = "onwork", name = "上班咯", icon = "💼",
+        tagline = "小心应对，高情商发言",
+        desc = "职场正统玩法。察言观色、投其所好，靠好感与分寸感往上走；一句话说错就要付出代价。",
+        difficulty = "标准",
+        scoreDriver = "favor",
+        driverLabel = "好感",
+    },
+    {
+        id = "offwork", name = "下班咯", icon = "🍻",
+        tagline = "低情商怼人，反而平步青云",
+        desc = "下班解压玩法。越敢说真话、越不给面子，越有骨气，升得越快；唯唯诺诺才会被优化。",
+        difficulty = "解压",
+        scoreDriver = "dignity",
+        driverLabel = "骨气",
+    },
+}
+
+--- 按 id 取模式配置；未知 id 回落到上班咯。
+---@param id string|nil
+---@return table
+function GameData.GetMode(id)
+    for _, mode in ipairs(GameData.Modes) do
+        if mode.id == id then return mode end
+    end
+    return GameData.Modes[1]
+end
 
 -- ============================================================================
 -- 职级阶梯 (Lv.1 ~ Lv.8)
@@ -250,14 +284,49 @@ GameData.Opponents = {
       portrait = "image/Art/NPC/client_normal.png" },
 }
 
--- 综合评分权重不变；低职级考核不要求买昂贵排面，按Lv分段公开门槛。
--- Lv1-2需45分，Lv3-4需48，Lv5-6需52，Lv7-8需55；+2仍需极佳属性。
+-- 综合评分权重按模式分流：
+--   上班咯：好感主导（权重最高），尊严只是保底，不舔就升不上去。
+--   下班咯：尊严（骨气）主导，好感反而可能成为负担。
+-- 门槛同样按模式给两套，保证两种玩法的节奏都成立。
 GameData.PromotionRules = {
     exceptionalLevels = 2,
-    scoreThresholds = { 45, 45, 48, 48, 52, 52, 55, 55 },
-    minFavor = 70, minSober = 60, minDignity = 30, minPro = 5,
-    description = "普通角色：达本职级晋升分数（Lv1-2:45/Lv3-4:48/Lv5-6:52/Lv7-8:55）、好感>=70、清醒>=60、尊严>=30、专业>=5，跨级晋升+2（最高Lv.8）；区域老板仍+1",
+    minSober = 60,
+    minPro = 5,
 }
+
+---@class ModePromotionRule
+---@field scoreThresholds number[]
+---@field favorWeight number
+---@field dignityWeight number
+---@field faceWeight number
+---@field vibeWeight number
+---@field proWeight number
+---@field minDriver number
+---@field minDignity number
+---@field description string
+
+---@type table<string, ModePromotionRule>
+GameData.PromotionModes = {
+    onwork = {
+        scoreThresholds = { 45, 45, 48, 48, 52, 52, 55, 55 },
+        favorWeight = 0.35, dignityWeight = 0.05, faceWeight = 0.20, vibeWeight = 0.15, proWeight = 0.15,
+        minDriver = 70, minDignity = 30,
+        description = "普通角色：达本职级晋升分数（Lv1-2:45/Lv3-4:48/Lv5-6:52/Lv7-8:55）、好感>=70、清醒>=60、尊严>=30、专业>=5，跨级晋升+2（最高Lv.8）；区域老板仍+1",
+    },
+    offwork = {
+        scoreThresholds = { 42, 42, 45, 45, 48, 48, 52, 52 },
+        favorWeight = 0.05, dignityWeight = 0.35, faceWeight = 0.15, vibeWeight = 0.15, proWeight = 0.10,
+        minDriver = 70, minDignity = 0,
+        description = "下班咯：达本职级晋升分数（Lv1-2:42/Lv3-4:45/Lv5-6:48/Lv7-8:52）、骨气(尊严)>=70、清醒>=60、专业>=5，跨级晋升+2（最高Lv.8）",
+    },
+}
+
+--- 取当前模式的评分规则；未知模式回落到上班咯。
+---@param modeId string|nil
+---@return ModePromotionRule
+function GameData.GetPromotionRule(modeId)
+    return GameData.PromotionModes[modeId or "onwork"] or GameData.PromotionModes.onwork
+end
 
 -- ============================================================================
 -- 对话事件库
@@ -503,12 +572,27 @@ function GameData.CollectHiddenBossAssets()
 end
 
 -- ============================================================================
--- 大话骰（简化版）：双方各 1 颗骰，隐藏对方点数，轮流加码或叫开
+-- 猜骰（比大小）：双方各 1 颗骰，对方点数全程隐藏
+-- 流程：对方先选（预先亮出）→ 玩家三选一（大 / 小 / 相同）→ 叫开亮骰
+--        → 双方点数不同 → 分出胜负；双方点数相同 → 重摇再选，直到分出胜负
 -- ============================================================================
-GameData.LiarsDice = {
-    dicePerSide = 1,
-    aiBluffChance = 0.35,        -- 明知不够也硬加码的概率（虚张声势）
-    aiChallengeChance = 0.55,    -- 估算命中率不足时叫开的概率
+GameData.GuessDice = {
+    faces = 6,
+    choices = {
+        { id = "big",    label = "大",   icon = "⬆️", hint = "我的点数会比他大" },
+        { id = "small",  label = "小",   icon = "⬇️", hint = "我的点数会比他小" },
+        { id = "same",   label = "相同", icon = "🟰", hint = "两人点数会一样" },
+    },
+    -- 对手性格影响其选择倾向：shrewd 更爱押「相同」博高赔率，blunt 更爱押「大」。
+    personalityBias = {
+        vain   = { big = 0.45, small = 0.35, same = 0.20 },
+        humble = { big = 0.30, small = 0.50, same = 0.20 },
+        blunt  = { big = 0.55, small = 0.30, same = 0.15 },
+        shrewd = { big = 0.30, small = 0.35, same = 0.35 },
+    },
+    -- 性格对「选择预告」的信息量：越直爽越容易被看穿（预告更准），越精明越会藏。
+    tellAccuracy = { vain = 0.55, humble = 0.60, blunt = 0.80, shrewd = 0.40 },
+    maxRerolls = 6,
 }
 
 -- 性格标签：决定情报内容、对手行为倾向，以及「选对」的加成档位

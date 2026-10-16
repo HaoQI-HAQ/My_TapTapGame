@@ -1,5 +1,5 @@
 -- ============================================================================
--- 《酒桌文化》v1.2.1 - 职场应酬生存模拟器
+-- 《酒桌文化》v1.3.0 - 职场应酬生存模拟器
 -- 主入口文件
 -- ============================================================================
 
@@ -93,7 +93,7 @@ function Start()
         function(completed, total, bytes) end,
         function(bytes) EnterMenu() end
     )
-    print("[酒桌文化] v1.2.1 启动，等待资源就绪")
+    print("[酒桌文化] v1.3.0 启动，等待资源就绪")
 end
 
 function Stop()
@@ -106,7 +106,7 @@ end
 -- 屏幕切换
 -- ============================================================================
 local screenTitles = {
-    select_workplace = "赴宴准备", select_character = "身份档案", day_start = "今日手记",
+    select_mode = "选择模式", select_workplace = "赴宴准备", select_character = "身份档案", day_start = "今日手记",
     rest_day = "休息日", select_restaurant = "挑选场地", select_drink_type = "挑选酒类",
     select_drink_brand = "挑选品牌", select_dish = "挑选菜品", playing = "饭局进行中",
     day_result = "散席复盘", game_over = "旅程结束", dice_demo = "摇骰练习", art_gallery = "人物图鉴",
@@ -144,6 +144,8 @@ function SwitchScreen(screenName)
 
     if screenName == "menu" then
         newRoot = Screens.CreateMainMenu()
+    elseif screenName == "select_mode" then
+        newRoot = Screens.CreateModeSelect()
     elseif screenName == "select_workplace" then
         newRoot = Screens.CreateWorkplaceSelect()
     elseif screenName == "select_character" then
