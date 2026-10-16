@@ -81,7 +81,7 @@ GameLogic.State = {
 
     -- 回合状态
     round = 0,
-    maxRounds = 8,
+    maxRounds = GameData.BanquetRounds,
     currentEvent = nil,     ---@type table|nil
     eventHistory = {},
     usedSkillToday = false,
@@ -205,7 +205,7 @@ function GameLogic.Reset()
     s.face = 0
     s.pro = 0
     s.round = 0
-    s.maxRounds = 8
+    s.maxRounds = GameData.BanquetRounds
     s.currentEvent = nil
     s.eventHistory = {}
     s.usedSkillToday = false
@@ -695,7 +695,7 @@ function GameLogic.ResetBanquetStats()
     s.face = 0
     s.pro = 0
     s.round = 0
-    s.maxRounds = math.random(6, 10)
+    s.maxRounds = GameData.BanquetRounds
     s.eventHistory = {}
     s.usedSkillToday = false
     s.drinkCount = 0
@@ -1112,8 +1112,13 @@ function GameLogic.GetNextEvent()
     s.round = s.round + 1
 
     if s.opponent and s.opponent.isBoss then
+        -- BossEvents 最后一条是 final（终局问答），其余在中间回合轮换。
+        -- 5 回合 = 4 个普通回合 + 1 个 final，普通回合按 (round-1) 对普通事件数取模，
+        -- 让 3 个普通事件尽量铺开而不是早早重复。
         local lastIndex = #GameData.BossEvents
-        local index = s.round >= s.maxRounds and lastIndex or ((s.round - 1) % (lastIndex - 1) + 1)
+        local normalCount = lastIndex - 1
+        local index = s.round >= s.maxRounds and lastIndex
+            or ((s.round - 1) % normalCount + 1)
         local event = GameData.BossEvents[index]
         if event.type == "final" then
             s.opponent.portrait = s.opponent.finalPortrait
@@ -1367,7 +1372,7 @@ function GameLogic.CheckSpecialEvents(event, choice)
 
     -- 🎤 KTV续场：氛围满 + 清醒 > 50% → 额外 Bonus 回合
     if s.vibe >= 100 and s.sober > 50 and s.bonusRounds == 0 then
-        s.bonusRounds = 2
+        s.bonusRounds = GameData.BonusRounds
         s.maxRounds = s.maxRounds + s.bonusRounds
         PushSpecialEvent(s, "ktv", "KTV 续场 · 额外 " .. s.bonusRounds .. " 回合，好感 ×1.5")
     end
