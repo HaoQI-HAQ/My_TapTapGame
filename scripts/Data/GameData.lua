@@ -578,11 +578,19 @@ end
 -- ============================================================================
 GameData.GuessDice = {
     faces = 6,
+    -- label  : 玩家按钮文案，统一以「我 vs 他」表述，避免歧义
+    -- tellLabel: 对手押注的同一参照系表述，便于和玩家自己的选择直接对比
+    -- hint   : 长按/说明用的一句话解释
     choices = {
-        { id = "big",    label = "大",   icon = "⬆️", hint = "我的点数会比他大" },
-        { id = "small",  label = "小",   icon = "⬇️", hint = "我的点数会比他小" },
-        { id = "same",   label = "相同", icon = "🟰", hint = "两人点数会一样" },
+        { id = "big",   label = "我更大", tellLabel = "他更大", icon = "⬆️",
+          hint = "我的点数比他的大" },
+        { id = "small", label = "我更小", tellLabel = "他更小", icon = "⬇️",
+          hint = "我的点数比他的小" },
+        { id = "same",  label = "一样大", tellLabel = "一样大", icon = "🟰",
+          hint = "两人点数完全相同" },
     },
+    -- 骰桌规则说明（展示在面板顶部，玩家第一眼就能看懂在赌什么）
+    legend = "赌的是「你的点数」和「他的点数」谁大 —— 你看不到他的点数。",
     -- 对手性格影响其选择倾向：shrewd 更爱押「相同」博高赔率，blunt 更爱押「大」。
     personalityBias = {
         vain   = { big = 0.45, small = 0.35, same = 0.20 },
@@ -594,6 +602,32 @@ GameData.GuessDice = {
     tellAccuracy = { vain = 0.55, humble = 0.60, blunt = 0.80, shrewd = 0.40 },
     maxRerolls = 6,
 }
+
+--- 取某个选项的配置。
+---@param id string
+---@return table|nil
+function GameData.GetGuessChoice(id)
+    for _, choice in ipairs(GameData.GuessDice.choices) do
+        if choice.id == id then return choice end
+    end
+    return nil
+end
+
+--- 玩家按钮文案（"我更大"）。
+---@param id string|nil
+---@return string
+function GameData.GuessChoiceLabel(id)
+    local choice = id and GameData.GetGuessChoice(id)
+    return choice and choice.label or "?"
+end
+
+--- 对手押注的同一参照系文案（"他更大"）。
+---@param id string|nil
+---@return string
+function GameData.GuessTellLabel(id)
+    local choice = id and GameData.GetGuessChoice(id)
+    return choice and choice.tellLabel or "?"
+end
 
 -- 性格标签：决定情报内容、对手行为倾向，以及「选对」的加成档位
 -- tierPref: 偏好的餐厅 Tier（用于选场地判定）

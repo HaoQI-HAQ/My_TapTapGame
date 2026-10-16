@@ -827,7 +827,7 @@ function GameLogic.GuessPick(choice)
     for _, c in ipairs(GameData.GuessDice.choices) do
         if c.id == choice then valid = true; break end
     end
-    if not valid then return false, "只能押大、小或相同" end
+    if not valid then return false, "只能选「我更大 / 我更小 / 一样大」" end
 
     G.playerChoice = choice
     G.revealed = true

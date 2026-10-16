@@ -1,5 +1,5 @@
 -- 饭局手记：角色舞台、骰桌与交谈独立排版；点数只由 GameLogic 决定。
--- 骰桌玩法为「猜骰·比大小」：对方先押并给预告，玩家押大/小/相同，叫开亮骰分胜负。
+-- 骰桌玩法为「猜骰·比大小」：对方先押并给预告，玩家选「我更大/我更小/一样大」，叫开亮骰分胜负。
 local UI = require("urhox-libs/UI")
 local GameLogic = require("Game.GameLogic")
 local GameData = require("Data.GameData")
@@ -91,58 +91,53 @@ function Playing.Create(navigate)
     local hiddenCup = Art.Picture(Art.Pick(A.diceCup), {width = 76, height = 84, id = "opponent_cup"})
     local playerResult = Art.Text("我方 · 待掷", 11, C.white, {width = 98, textAlign = "center", whiteSpace = "nowrap"})
     local opponentResult = Art.Text("对方 · 保密", 11, C.lilac, {width = 98, textAlign = "center", whiteSpace = "nowrap"})
-    -- 中央展示「对方的预告」——这是本玩法的核心信息来源。
-    local tellIcon = Art.Title("—", 30, C.yellow, {width = "100%", textAlign = "center", id = "guess_tell"})
-    local tellCaption = Art.Text("对方要押", 10, C.lilac, {width = "100%", textAlign = "center"})
-    local status = Art.Text("先摇骰，再押大、小或相同。", 12, C.white,
+    -- 中央：对方押了什么（用「他更大」这类同一参照系文案，避免和玩家的选择混淆）
+    local tellIcon = Art.Title("—", 22, C.yellow, {width = "100%", textAlign = "center", id = "guess_tell"})
+    local tellCaption = Art.Text("他押的是", 10, C.lilac, {width = "100%", textAlign = "center"})
+    -- 顶部规则说明：第一眼就知道在赌什么
+    local legend = Art.Text(GameData.GuessDice.legend, 10, C.lilac,
+        {width = "100%", id = "guess_legend", lineHeight = 1.45})
+    local status = Art.Text("先摇骰，再选你和他谁的点数大。", 12, C.white,
         {width = "100%", id = "guess_status"})
-    local rule = Art.Text("双方各一颗骰子，你看不到他的点数。\n他先押，再轮到你 —— 押对者赢；点数相同则重摇再押。", 10, C.lilac,
-        {width = "100%"})
     local result = Art.Text("", 12, C.yellow, {width = "100%", id = "guess_result"})
     result:Hide()
     local diceRow = UI.Panel {width = "100%", flexDirection = "row", justifyContent = "space-around",
         alignItems = "center", gap = 8, children = {
             UI.Panel {alignItems = "center", gap = 3, children = {ownCup, playerDice, playerResult}},
-            UI.Panel {alignItems = "center", width = 84, children = {tellCaption, tellIcon}},
+            UI.Panel {alignItems = "center", width = 92, children = {tellCaption, tellIcon}},
             UI.Panel {alignItems = "center", gap = 3, children = {hiddenCup, opponentDice, opponentResult}},
         }}
     local rollButton = Art.Button("摇骰 · 开始本轮", nil, false, {id = "roll_dice", width = "100%"})
-    -- 三个选择按钮：大 / 小 / 相同
+    -- 三个选择按钮：我更大 / 我更小 / 一样大
     ---@type table<string, Widget>
     local guessButtons = {}
     ---@type Widget[]
     local guessChildren = {}
-    ---@type table<string, string>
-    local choiceLabels = {}
     for _, choice in ipairs(GameData.GuessDice.choices) do
-        choiceLabels[choice.id] = choice.label
-    end
-    local SubmitGuess = function(choiceId)
-        if not alive or rolling or settled or chosen then return end
-        local G = s.guess
-        if not G or not G.active or G.winner then return end
-        local ok, err = GameLogic.GuessPick(choiceId)
-        if not ok then UI.Toast.Show(tostring(err), {variant = "warning"}); return end
-        print("[BanquetUI] 玩家押 " .. choiceId)
-        if G.winner then
-            Settle()
-        else
-            -- 点数相同：延迟一下再重摇，让玩家看清「平局重摇」发生了什么。
-            status:SetText("点数相同，本局作废 —— 重新摇骰，再押一次…")
-            result:SetText("双方都是 " .. G.playerDie .. " 点，平局重摇。")
-            result:Show()
-            rerollDelay = 1.1
-            RefreshActions()
-        end
-    end
-    for _, choice in ipairs(GameData.GuessDice.choices) do
-        local button = Art.Button(choice.icon .. " " .. choice.label, function() SubmitGuess(choice.id) end, true,
+        local button = Art.Button(choice.icon .. " " .. choice.label, function()
+            if not alive or rolling or settled or chosen then return end
+            local G = s.guess
+            if not G or not G.active or G.winner then return end
+            local ok, err = GameLogic.GuessPick(choice.id)
+            if not ok then UI.Toast.Show(tostring(err), {variant = "warning"}); return end
+            print("[BanquetUI] 玩家押 " .. choice.id)
+            if G.winner then
+                Settle()
+            else
+                -- 点数相同：延迟一下再重摇，让玩家看清「平局重摇」发生了什么。
+                status:SetText("点数相同，本局作废 —— 重新摇骰，再选一次…")
+                result:SetText("双方都是 " .. G.playerDie .. " 点，平局重摇。")
+                result:Show()
+                rerollDelay = 1.1
+                RefreshActions()
+            end
+        end, true,
             {id = "guess_" .. choice.id, flexGrow = 1, flexBasis = 0, flexShrink = 1,
-                minWidth = 0, minHeight = 52, paddingHorizontal = 6, paddingVertical = 8, fontSize = 15})
+                minWidth = 0, minHeight = 54, paddingHorizontal = 6, paddingVertical = 8, fontSize = 15})
         guessButtons[choice.id] = button
         guessChildren[#guessChildren + 1] = button
     end
-    local actionHint = Art.Text("押一个：大 / 小 / 相同", 10, C.lilac, {width = "100%", id = "guess_hint"})
+    local actionHint = Art.Text("选一个：你觉得谁的点数更大？", 10, C.lilac, {width = "100%", id = "guess_hint"})
     local actionPanel = UI.Panel {id = "guess_actions", width = "100%", gap = 10, children = {
         actionHint, UI.Panel {width = "100%", flexDirection = "row", gap = 8,
             justifyContent = "center", children = guessChildren}}}
@@ -156,7 +151,7 @@ function Playing.Create(navigate)
         UI.Panel {width = "100%", flexDirection = "row", justifyContent = "space-between", children = {
             Art.Title("猜骰 · 比大小", 18, C.white, {width = "50%"}),
             Art.Text("ROUND " .. s.round .. " / " .. s.maxRounds, 10, C.yellow, {width = "50%", textAlign = "right"})}},
-        diceRow, status, rule, rollButton, actionPanel, result, resultContinue,
+        legend, diceRow, status, rollButton, actionPanel, result, resultContinue,
     }, {id = "dice_stage", gap = 12, minWidth = 0, width = "100%"}, true)
 
     local speaker = Art.Text("本轮交谈尚未开始", 11, C.purple, {width = "100%"})
@@ -232,8 +227,9 @@ function Playing.Create(navigate)
             Art.SetDisabled(guessButtons[choice.id], not canAct)
         end
         if canAct then
-            actionHint:SetText("他的预告：押「" .. (choiceLabels[G.tellChoice] or "?") ..
-                "」" .. (G.tellTrue and "（看着挺真）" or "（八成在骗你）") .. " · 你押哪个？")
+            actionHint:SetText("他押「" .. GameData.GuessTellLabel(G.tellChoice) ..
+                "」" .. (G.tellTrue and "（看着挺真）" or "（八成在骗你）") ..
+                " · 你觉得谁更大？")
         else
             actionHint:SetText(settled and "本轮已分出胜负。" or "等待摇骰…")
         end
@@ -274,8 +270,9 @@ function Playing.Create(navigate)
         local mine, theirs = G.playerDie, G.opponentDie
         local relation = mine > theirs and "你的点数更大" or (mine < theirs and "他的点数更大" or "双方点数相同")
         status:SetText(won and "你押中了，赢得本轮话语权" or "他没让你得逞，本轮话语权归他")
-        result:SetText("揭晓：你 " .. mine .. " 点（押 " .. (choiceLabels[G.playerChoice] or "?") ..
-            "） · 他 " .. theirs .. " 点（押 " .. (choiceLabels[G.opponentChoice] or "?") .. "）" ..
+        result:SetText("揭晓：你 " .. mine .. " 点 · 他 " .. theirs .. " 点" ..
+            "\n你押「" .. GameData.GuessChoiceLabel(G.playerChoice) ..
+            "」 · 他押「" .. GameData.GuessTellLabel(G.opponentChoice) .. "」" ..
             "\n" .. relation .. " —— " .. (won and "你赢了这一手。" or "这一手你输了。"))
         result:Show()
         hiddenCup:Hide()
@@ -307,8 +304,8 @@ function Playing.Create(navigate)
             playerResult:SetText("我方 · " .. G.playerDie .. " 点")
             local tell, isTrue = GameLogic.GuessTell()
             G.tellChoice, G.tellTrue = tell, isTrue
-            tellIcon:SetText((choiceLabels[tell] or "?"))
-            status:SetText("摇好了。他押「" .. (choiceLabels[G.opponentChoice] or "?") .. "」，轮到你。")
+            tellIcon:SetText(GameData.GuessTellLabel(tell))
+            status:SetText("摇好了。他押「" .. GameData.GuessTellLabel(G.opponentChoice) .. "」，轮到你。")
             actionPanel:Show()
             RefreshActions()
         end
@@ -318,13 +315,13 @@ function Playing.Create(navigate)
         if not alive or rolling or settled then return end
         local G = GameLogic.StartGuessRound()
         rolling = true
-        rule:Hide()
+        legend:Hide()
         RefreshActions()
         rollButton:Hide()
         ownCup:Hide()
         playerDice:Show()
         PlaySound(false)
-        status:SetText("骰子落定后，轮到你押。")
+        status:SetText("骰子落定后，轮到你选。")
         playerResult:SetText("我方 · 摇骰中")
         playerDice.props.onComplete = function()
             if not alive then return end
@@ -335,8 +332,9 @@ function Playing.Create(navigate)
             -- 对手先押，并给出一个可能真可能假的「预告」。
             local tell, isTrue = GameLogic.GuessTell()
             G.tellChoice, G.tellTrue = tell, isTrue
-            tellIcon:SetText((choiceLabels[tell] or "?"))
-            status:SetText("他先押了「" .. (choiceLabels[G.opponentChoice] or "?") .. "」。轮到你 —— 押大、小还是相同？")
+            tellIcon:SetText(GameData.GuessTellLabel(tell))
+            status:SetText("他押「" .. GameData.GuessTellLabel(G.opponentChoice) ..
+                "」。轮到你 —— 你和他，谁的点数更大？")
             actionPanel:Show()
             RefreshActions()
         end
@@ -354,6 +352,8 @@ function Playing.Create(navigate)
         end
         workspace:SetStyle({flexDirection = narrow and "column" or "row", gap = 14})
         diceCard:SetStyle({width = narrow and "100%" or "40%", flexShrink = 0, padding = pad, gap = 8})
+        -- 短屏优先保证骰桌与按钮可见，规则说明只在空间充足时展示。
+        legend:SetVisible(not short)
         dialogueCard:SetStyle({width = narrow and "100%" or "auto", flexGrow = 1,
             flexShrink = 1, flexBasis = narrow and "auto" or 0, padding = short and 14 or 20})
         dialogue:SetFontSize(short and 12 or 14)
