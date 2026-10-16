@@ -102,7 +102,6 @@ GameLogic.State = {
         winner = nil,          -- "player" / "opponent" / nil
         rerolls = 0,           -- 重摇次数
         rerollInfo = nil,      -- 上次重摇的快照（reason/dice/choices），供 UI 解释
-        bothHit = false,       -- 本局双方是否都押中（玩家后押占优，仍判玩家赢）
     },
     -- 当日情报（赢得话语权后问得，供次日参考）
     intel = nil,           ---@type table|nil
@@ -715,7 +714,7 @@ function GameLogic.ResetBanquetStats()
     s.specialEvents = {}
     s.guess = { active = false, playerDie = 0, opponentDie = 0, opponentChoice = nil,
         playerChoice = nil, tellChoice = nil, tellTrue = false, revealed = false,
-        winner = nil, rerolls = 0, rerollInfo = nil, bothHit = false }
+        winner = nil, rerolls = 0, rerollInfo = nil }
     return true
 end
 
@@ -769,7 +768,6 @@ function GameLogic.StartGuessRound()
     G.active = true
     G.rerolls = 0
     G.rerollInfo = nil
-    G.bothHit = false
     G.winner = nil
     G.playerChoice = nil
     GameLogic.RollGuessDice()
@@ -794,35 +792,40 @@ function GameLogic.RollGuessDice()
     G.opponentChoice = PickOpponentChoice(s.opponentPersonality)
     G.revealed = false
     G.playerChoice = nil
-    print(string.format("[Guess] 摇骰 玩家=%d 对手=%d 对手选择=%s",
-        G.playerDie, G.opponentDie, tostring(G.opponentChoice)))
+    -- 预告在摇骰时一次性生成并落库：UI 重绘/重进界面都读同一个值，不会前后矛盾。
+    GameLogic.RollGuessTell()
+    print(string.format("[Guess] 摇骰 玩家=%d 对手=%d 对手选择=%s 预告=%s(%s)",
+        G.playerDie, G.opponentDie, tostring(G.opponentChoice),
+        tostring(G.tellChoice), tostring(G.tellTrue)))
     return G
 end
 
---- 对手选择的「预告」：越直爽的性格越容易被看穿，越精明越会藏。
---- 返回预告选项与是否为真话。
----@return string, boolean
-function GameLogic.GuessTell()
+--- 生成对手的「预告」（可能为假），结果写入 G.tellChoice / G.tellTrue。
+--- 越直爽的性格越容易被看穿（准确率高），越精明越会藏。
+function GameLogic.RollGuessTell()
     local s = GameLogic.State
     local G = s.guess
     local cfg = GameData.GuessDice
     local actual = G.opponentChoice or "big"
     local accuracy = cfg.tellAccuracy[s.opponentPersonality or ""] or 0.5
-    if math.random() < accuracy then return actual, true end
+    if math.random() < accuracy then
+        G.tellChoice, G.tellTrue = actual, true
+        return
+    end
     -- 说谎：随机换一个别的选项
     local pool = {}
     for _, choice in ipairs(cfg.choices) do
         if choice.id ~= actual then pool[#pool + 1] = choice.id end
     end
-    return pool[math.random(1, #pool)], false
+    G.tellChoice, G.tellTrue = pool[math.random(1, #pool)], false
 end
 
 --- 玩家选择「我更大 / 我更小 / 一样大」，随后叫开亮骰。
---- 判定原则：
----   · 玩家押中 → 玩家赢（玩家后押、看过预告，本就占信息优势）
----   · 玩家没押中、对手押中 → 对手赢
----   · 双方都没押中（都看走眼）→ 没分出高下，重摇再选
---- 注意：绝不能因为「谁点数大」就判谁赢 —— 这是猜骰，押错就是押错。
+--- 判定原则：**只有一方押中才算分出胜负**，双方看法一致（都中/都错）就是平手。
+---   · 玩家中、对手没中 → 玩家赢
+---   · 对手中、玩家没中 → 对手赢
+---   · 都押中 或 都没押中 → **平手**，重摇再选（不偏袒任何一方）
+--- 注意：绝不能因为「谁点数大」就判谁赢，也不给「后押占优」的偏袒 —— 这是猜骰，押错就是押错。
 ---@param choice string
 ---@return boolean, string|nil
 function GameLogic.GuessPick(choice)
@@ -839,29 +842,27 @@ function GameLogic.GuessPick(choice)
     local playerHit = GuessHit(choice, G.playerDie, G.opponentDie)
     local opponentHit = GuessHit(G.opponentChoice, G.opponentDie, G.playerDie)
 
-    if playerHit then
+    if playerHit and not opponentHit then
         G.winner = "player"
-        -- 双方都押中时，记录一下，UI 可解释「他也看准了，但你后押占优」
-        G.bothHit = opponentHit
-    elseif opponentHit then
+    elseif opponentHit and not playerHit then
         G.winner = "opponent"
     else
-        -- 双方都没押中：都没看准，本局作废重摇
+        -- 平手：双方都押中（看法一致）或都没押中（都看走眼）
         G.rerollInfo = {
-            reason = "both_miss",
+            reason = (playerHit and opponentHit) and "both_hit" or "both_miss",
             playerDie = G.playerDie, opponentDie = G.opponentDie,
             playerChoice = choice, opponentChoice = G.opponentChoice,
         }
         G.rerolls = G.rerolls + 1
         if G.rerolls >= GameData.GuessDice.maxRerolls then
-            -- 兜底：连续重摇太多次，判对手胜，避免死循环
+            -- 兜底：连续平手太多次，判对手胜，避免死循环
             G.winner = "opponent"
             G.rerollInfo = nil
             print("[Guess] 重摇次数超限，判对手胜")
             return true, G.winner
         end
-        print(string.format("[Guess] 重摇 玩家=%d/%s 对手=%d/%s 第%d次",
-            G.playerDie, choice, G.opponentDie, tostring(G.opponentChoice), G.rerolls))
+        print(string.format("[Guess] 平手(%s) 玩家=%d/%s 对手=%d/%s 第%d次",
+            G.rerollInfo.reason, G.playerDie, choice, G.opponentDie, tostring(G.opponentChoice), G.rerolls))
         GameLogic.RollGuessDice()
         return true, nil
     end

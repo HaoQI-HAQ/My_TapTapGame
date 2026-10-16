@@ -124,16 +124,17 @@ function Playing.Create(navigate)
             if G.winner then
                 Settle()
             else
-                -- 双方都没押中 → 重摇。用快照说清「刚才为什么不算」。
+                -- 平手 → 重摇。用快照说清「刚才为什么算平手」。
                 local info = G.rerollInfo or {}
                 local mine = info.playerDie or G.playerDie
                 local theirs = info.opponentDie or G.opponentDie
                 local mineChoice = GameData.GuessChoiceLabel(info.playerChoice or choice.id)
                 local hisChoice = GameData.GuessTellLabel(info.opponentChoice or G.opponentChoice)
-                status:SetText("两人都没押中 —— 没分出胜负，重新摇骰再选…")
+                local why = info.reason == "both_hit" and "两人都押中了" or "两人都没押中"
+                status:SetText(why .. " —— 平手，重新摇骰再选…")
                 result:SetText("刚才：你 " .. mine .. " 点（" .. mineChoice ..
                     "） · 他 " .. theirs .. " 点（" .. hisChoice .. "）" ..
-                    "\n两人都没押中，本局作废。")
+                    "\n" .. why .. "，本局平手作废。")
                 result:Show()
                 rerollDelay = 1.2
                 RefreshActions()
@@ -280,9 +281,8 @@ function Playing.Create(navigate)
         result:SetText("揭晓：你 " .. mine .. " 点 · 他 " .. theirs .. " 点" ..
             "\n你押「" .. GameData.GuessChoiceLabel(G.playerChoice) ..
             "」 · 他押「" .. GameData.GuessTellLabel(G.opponentChoice) .. "」" ..
-            "\n" .. relation ..
-            (won and (G.bothHit and " —— 他也押中了，但你后押占优，你赢。" or " —— 你赢了这一手。")
-                or " —— 这一手你输了。"))
+            "\n" .. relation .. " —— " ..
+            (won and "你押中了，这一手你赢。" or "他押中了，这一手你输。"))
         result:Show()
         hiddenCup:Hide()
         opponentDice:Show()
@@ -311,10 +311,9 @@ function Playing.Create(navigate)
             rolling = false
             PlaySound(true)
             playerResult:SetText("我方 · " .. G.playerDie .. " 点")
-            local tell, isTrue = GameLogic.GuessTell()
-            G.tellChoice, G.tellTrue = tell, isTrue
-            tellIcon:SetText(GameData.GuessTellLabel(tell))
-            status:SetText("摇好了。他押「" .. GameData.GuessTellLabel(G.opponentChoice) .. "」，轮到你。")
+            -- ⚠️ 只能引用预告 G.tellChoice，绝不能写 G.opponentChoice（真实选择），否则泄露答案。
+            tellIcon:SetText(GameData.GuessTellLabel(G.tellChoice))
+            status:SetText("摇好了。他押「" .. GameData.GuessTellLabel(G.tellChoice) .. "」，轮到你。")
             actionPanel:Show()
             RefreshActions()
         end
@@ -338,11 +337,9 @@ function Playing.Create(navigate)
             PlaySound(true)
             playerResult:SetText("我方 · " .. G.playerDie .. " 点")
             if G.winner then Settle(); return end
-            -- 对手先押，并给出一个可能真可能假的「预告」。
-            local tell, isTrue = GameLogic.GuessTell()
-            G.tellChoice, G.tellTrue = tell, isTrue
-            tellIcon:SetText(GameData.GuessTellLabel(tell))
-            status:SetText("他押「" .. GameData.GuessTellLabel(G.opponentChoice) ..
+            -- ⚠️ 状态行只能引用预告 G.tellChoice，绝不能写 G.opponentChoice（真实选择），否则泄露答案。
+            tellIcon:SetText(GameData.GuessTellLabel(G.tellChoice))
+            status:SetText("他押「" .. GameData.GuessTellLabel(G.tellChoice) ..
                 "」。轮到你 —— 你和他，谁的点数更大？")
             actionPanel:Show()
             RefreshActions()
