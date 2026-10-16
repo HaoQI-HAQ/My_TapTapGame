@@ -650,13 +650,36 @@ GameData.IntelBonus = {
     mismatch= { favor = -4, vibe = -3, desc = "没踩在点上" },
 }
 
--- 情报问题：玩家赢得话语权后可问，每场最多问 1 个
+-- 情报问题库：每次开局随机抽 4 个给玩家选（见 GameLogic.RollIntelOffers）。
+-- kind = "value"：能推出明日对手的偏好，问了有用。
+-- kind = "fluff"：纯闲聊，问了等于浪费这次机会 —— 玩家需要自己判断哪个值得问。
+-- category：指向 IntelAnswers 里的答案维度。
 GameData.IntelQuestions = {
-    { id = "drink",  text = "今晚想喝点什么？",       category = "drink" },
-    { id = "dish",   text = "有什么忌口或偏爱？",     category = "dish" },
-    { id = "place",  text = "平时喜欢去哪儿吃？",     category = "place" },
-    { id = "person", text = "您是个什么样的人？",     category = "person" },
+    -- ── 有价值：能问出真实偏好 ──
+    { id = "drink",      text = "今晚想喝点什么？",         category = "drink",  kind = "value" },
+    { id = "dish",       text = "有什么忌口或偏爱？",       category = "dish",   kind = "value" },
+    { id = "place",      text = "平时喜欢去哪儿吃？",       category = "place",  kind = "value" },
+    { id = "budget",     text = "这顿想控制在什么档次？",   category = "budget", kind = "value" },
+    { id = "person",     text = "您是个什么样的人？",       category = "person", kind = "value" },
+    { id = "wine_style", text = "喝酒您有什么讲究吗？",     category = "drink",  kind = "value" },
+    { id = "dish_style", text = "您点菜一般什么原则？",     category = "dish",   kind = "value" },
+    { id = "venue",      text = "更喜欢包间还是大堂？",     category = "place",  kind = "value" },
+    { id = "spend",      text = "花钱这事您怎么看？",       category = "budget", kind = "value" },
+    { id = "self",       text = "要不聊聊您自己？",         category = "person", kind = "value" },
+    -- ── 没价值：纯闲聊，问了等于浪费机会 ──
+    { id = "weather",    text = "今天天气不错哈？",         category = "fluff",  kind = "fluff" },
+    { id = "ball",       text = "您平时看球吗？",           category = "fluff",  kind = "fluff" },
+    { id = "traffic",    text = "过来路上堵不堵？",         category = "fluff",  kind = "fluff" },
+    { id = "weekend",    text = "周末有什么安排？",         category = "fluff",  kind = "fluff" },
+    { id = "hometown",   text = "您老家哪儿的？",           category = "fluff",  kind = "fluff" },
+    { id = "zodiac",     text = "您什么星座的？",           category = "fluff",  kind = "fluff" },
+    { id = "coffee",     text = "您平时喝咖啡还是喝茶？",   category = "fluff",  kind = "fluff" },
 }
+
+--- 每次开局抽取的问题数量。
+GameData.IntelOfferCount = 4
+--- 抽取时保证至少出现几个「有价值」问题，避免全是闲聊导致玩家无从判断。
+GameData.IntelMinValue = 2
 
 -- 情报答案：按性格 × 类别，给出隐晦片面的信息
 GameData.IntelAnswers = {
@@ -664,25 +687,33 @@ GameData.IntelAnswers = {
         drink = { text = "\"酒嘛，得看牌子。便宜的拿不出手。\"", tag = "偏好高价酒" },
         dish  = { text = "\"菜要够档次，摆盘也得讲究。\"",       tag = "偏好高价菜" },
         place = { text = "\"环境最重要，路边摊就算了。\"",       tag = "偏好高 Tier 餐厅" },
+        budget= { text = "\"请客嘛，太寒酸像什么话。\"",         tag = "预算要撑得起场面" },
         person= { text = "\"场面上的事，不能含糊。\"",           tag = "爱慕虚荣" },
+        fluff = { text = "\"嗯……还行吧。\"（对方明显不想聊这个）", tag = "无关信息" },
     },
     humble = {
         drink = { text = "\"喝什么都行，别整那些虚的。\"",       tag = "不在意酒价" },
         dish  = { text = "\"家常菜就挺好，别浪费。\"",           tag = "偏好实在菜" },
         place = { text = "\"人多热闹的地方就行。\"",             tag = "偏好低 Tier 餐厅" },
+        budget= { text = "\"够吃够喝就行，别铺张。\"",           tag = "预算适中即可" },
         person= { text = "\"我这人不讲究那些排场。\"",           tag = "谦虚务实" },
+        fluff = { text = "\"嗨，都那样吧。\"（对方敷衍了两句）", tag = "无关信息" },
     },
     blunt = {
         drink = { text = "\"能喝的酒就是好酒。\"",               tag = "偏好高度酒" },
         dish  = { text = "\"来点硬菜，别上那些花里胡哨的。\"",   tag = "偏好硬菜" },
         place = { text = "\"哪都能喝，主要是跟谁喝。\"",         tag = "不在意餐厅" },
+        budget= { text = "\"钱不是问题，关键是尽兴。\"",         tag = "预算大方" },
         person= { text = "\"我这人说话直，你别介意。\"",         tag = "直爽豪迈" },
+        fluff = { text = "\"哈哈，是啊是啊。\"（对方笑着岔开了话题）", tag = "无关信息" },
     },
     shrewd = {
         drink = { text = "\"酒水利润高，懂行的不会乱点。\"",     tag = "在意性价比" },
         dish  = { text = "\"点菜要看时令，反季的最贵。\"",       tag = "偏好时令菜" },
         place = { text = "\"同样的菜，换个地方贵三倍。\"",       tag = "偏好性价比餐厅" },
+        budget= { text = "\"钱要花在刀刃上。\"",                 tag = "精明算计" },
         person= { text = "\"钱要花在刀刃上。\"",                 tag = "精明算计" },
+        fluff = { text = "\"哦，是吗。\"（对方礼貌地结束了这个话题）", tag = "无关信息" },
     },
 }
 

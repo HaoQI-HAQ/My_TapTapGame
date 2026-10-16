@@ -13,21 +13,50 @@ local C, A = Art.C, Art.Assets
 ---@field scene Scene?
 ---@field roll SoundSource?
 ---@field land SoundSource?
+---@field reroll SoundSource?
+---@field win SoundSource?
+---@field lose SoundSource?
 ---@type BanquetDiceAudio
 local audio = {}
-local function PlaySound(landing)
+
+local SFX = {
+    roll = "audio/sfx/dice_roll.mp3",
+    land = "audio/sfx/dice_land.mp3",
+    reroll = "audio/sfx/dice_reroll.mp3",
+    win = "audio/sfx/guess_win.mp3",
+    lose = "audio/sfx/guess_lose.mp3",
+}
+
+---@param key string
+---@param volume number
+local function PlaySfx(key, volume)
     if not audio.scene then
         audio.scene = Scene()
         local node = audio.scene:CreateChild("BanquetDiceAudio")
         audio.roll = node:CreateComponent("SoundSource")
         audio.land = node:CreateComponent("SoundSource")
-        audio.roll.soundType = SOUND_EFFECT
-        audio.land.soundType = SOUND_EFFECT
+        audio.reroll = node:CreateComponent("SoundSource")
+        audio.win = node:CreateComponent("SoundSource")
+        audio.lose = node:CreateComponent("SoundSource")
+        for _, source in ipairs({audio.roll, audio.land, audio.reroll, audio.win, audio.lose}) do
+            source.soundType = SOUND_EFFECT
+        end
     end
-    local source = landing and audio.land or audio.roll
-    local path = landing and "audio/sfx/dice_land.mp3" or "audio/sfx/dice_roll.mp3"
+    local source = audio[key]
+    local path = SFX[key]
+    if not source or not path then return end
     local sound = cache:GetResource("Sound", path)
-    if source and sound then source:Play(sound, sound:GetFrequency(), landing and 0.75 or 0.6) end
+    if sound then source:Play(sound, sound:GetFrequency(), volume) end
+end
+
+local function PlaySound(landing)
+    PlaySfx(landing and "land" or "roll", landing and 0.75 or 0.6)
+end
+
+--- 胜负提示音：短促有力，一局只响一次。
+---@param won boolean
+local function PlayGuessOutcome(won)
+    PlaySfx(won and "win" or "lose", 0.8)
 end
 
 local hiddenAssetsReady = false
@@ -136,6 +165,7 @@ function Playing.Create(navigate)
                     "） · 他 " .. theirs .. " 点（" .. hisChoice .. "）" ..
                     "\n" .. why .. "，本局平手作废。")
                 result:Show()
+                PlaySfx("reroll", 0.75)
                 rerollDelay = 1.2
                 RefreshActions()
             end
@@ -207,10 +237,19 @@ function Playing.Create(navigate)
             local info, err = GameLogic.AskIntel(question.id)
             if not info then UI.Toast.Show(tostring(err or "暂时无法打听情报"), {variant = "warning"}); return end
             intelQuestions:Hide()
-            intelTag:SetText("明日情报 / " .. tostring(info.tag))
-            intelAnswer:SetText(tostring(info.answer))
+            if info.useless then
+                -- 问了闲聊问题：明确告诉玩家这次机会浪费了，避免误以为拿到了情报。
+                intelTag:SetText("无关信息 / 这次白问了")
+                intelTag:SetStyle({fontColor = C.red})
+                intelAnswer:SetText(tostring(info.answer) .. "\n（这个问题问不出什么，明日无从参考。）")
+                PlaySfx("lose", 0.5)
+            else
+                intelTag:SetText("明日情报 / " .. tostring(info.tag))
+                intelTag:SetStyle({fontColor = C.purple})
+                intelAnswer:SetText(tostring(info.answer))
+            end
             intelResponse:Show()
-            print("[BanquetUI] 明日情报 " .. question.id)
+            print("[BanquetUI] 情报提问 " .. question.id .. (info.useless and "（闲聊）" or ""))
         end, true, {width = "100%", textAlign = "left", id = "intel_" .. question.id}))
     end
     intelQuestions:Hide()
@@ -278,12 +317,16 @@ function Playing.Create(navigate)
         local mine, theirs = G.playerDie, G.opponentDie
         local relation = mine > theirs and "你的点数更大" or (mine < theirs and "他的点数更大" or "双方点数相同")
         status:SetText(won and "你押中了，赢得本轮话语权" or "他没让你得逞，本轮话语权归他")
+        -- 亮骰即真相公开：顶部「他押的是」从预告切换为真实选择，与揭晓行保持一致。
+        tellIcon:SetText(GameData.GuessTellLabel(G.opponentChoice))
+        tellCaption:SetText("他押的是")
         result:SetText("揭晓：你 " .. mine .. " 点 · 他 " .. theirs .. " 点" ..
             "\n你押「" .. GameData.GuessChoiceLabel(G.playerChoice) ..
             "」 · 他押「" .. GameData.GuessTellLabel(G.opponentChoice) .. "」" ..
             "\n" .. relation .. " —— " ..
             (won and "你押中了，这一手你赢。" or "他押中了，这一手你输。"))
         result:Show()
+        PlayGuessOutcome(won)
         hiddenCup:Hide()
         opponentDice:Show()
         opponentResult:SetText("对方 · " .. theirs .. " 点")
@@ -421,8 +464,9 @@ function Playing.Create(navigate)
 end
 
 function Playing.Shutdown()
-    if audio.roll then audio.roll:StopImmediate() end
-    if audio.land then audio.land:StopImmediate() end
+    for _, source in ipairs({audio.roll, audio.land, audio.reroll, audio.win, audio.lose}) do
+        if source then source:StopImmediate() end
+    end
     if audio.scene then audio.scene:Dispose() end
     audio = {}
 end

@@ -106,6 +106,7 @@ GameLogic.State = {
     -- 当日情报（赢得话语权后问得，供次日参考）
     intel = nil,           ---@type table|nil
     intelUsedToday = false,
+    intelOffers = {},      ---@type table[] 本轮随机抽到的问题（4 个，含价值与闲聊）
     -- 每日对手性格（次日沿用同一对手池，情报有实际价值）
     opponentPersonality = nil, ---@type string|nil
     -- 性格日程：开局预生成每天的性格，使「今日情报」能预测「明日对手」
@@ -177,10 +178,12 @@ function GameLogic.Reset()
     s.dignityUnlocked = false
     s.bonusRounds = 0
     s.specialEvents = {}
-    s.liar = { active = false, playerDie = 0, opponentDie = 0, currentBid = 0,
-        turn = "player", revealOpponent = false, winner = nil, rounds = 0 }
+    s.guess = { active = false, playerDie = 0, opponentDie = 0, opponentChoice = nil,
+        playerChoice = nil, tellChoice = nil, tellTrue = false, revealed = false,
+        winner = nil, rerolls = 0, rerollInfo = nil }
     s.intel = nil
     s.intelUsedToday = false
+    s.intelOffers = {}
     s.opponentPersonality = nil
     s.budgetFailure = false
     s.currentLevel = 1
@@ -705,8 +708,10 @@ function GameLogic.ResetBanquetStats()
     s.bossCompleted = false
     s.bossDefeated = false
     s.budgetFailure = false
-    -- 每日情报重置（intel 本身保留，供次日参考）
+    -- 每日情报重置（intel 本身保留，供次日参考）；问题每场重新抽，避免每天都一样
     s.intelUsedToday = false
+    s.intelOffers = {}
+    GameLogic.RollIntelOffers()
     -- 单局特殊事件：每日重置（diceBonus / dignityUnlocked 跨局保留）
     s.drinkToastStreak = 0
     s.quitInDrunk = false
@@ -918,30 +923,88 @@ end
 -- 情报系统：赢得话语权后询问对手，获得隐晦信息
 -- ============================================================================
 
---- 获取可问的问题列表（每场最多问 1 个）
+--- 每次开局抽取本轮可问的问题（4 个），存到 State.intelOffers。
+--- 规则：从有价值问题里抽 IntelMinValue 个，其余名额从闲聊问题里补，
+--- 让玩家必须自己分辨「哪个问题值得问」。
+function GameLogic.RollIntelOffers()
+    local s = GameLogic.State
+    local valuePool, fluffPool = {}, {}
+    for _, q in ipairs(GameData.IntelQuestions) do
+        if q.kind == "fluff" then fluffPool[#fluffPool + 1] = q
+        else valuePool[#valuePool + 1] = q end
+    end
+    -- 洗牌
+    local function Shuffle(pool)
+        for i = #pool, 2, -1 do
+            local j = math.random(1, i)
+            pool[i], pool[j] = pool[j], pool[i]
+        end
+    end
+    Shuffle(valuePool)
+    Shuffle(fluffPool)
+
+    local offers, total = {}, GameData.IntelOfferCount
+    local wantValue = math.min(GameData.IntelMinValue, #valuePool)
+    -- 闲聊问题最多占 (总数 - 最少价值数)，避免整屏都是废话
+    local maxFluff = math.min(#fluffPool, total - wantValue)
+    local wantFluff = math.min(maxFluff, total - wantValue)
+    -- 价值问题可多补（若闲聊池不足）
+    wantValue = math.min(#valuePool, total - wantFluff)
+
+    for i = 1, wantValue do offers[#offers + 1] = valuePool[i] end
+    for i = 1, wantFluff do offers[#offers + 1] = fluffPool[i] end
+    Shuffle(offers)
+    s.intelOffers = offers
+    print(string.format("[Intel] 本轮抽到 %d 个问题（价值 %d / 闲聊 %d）",
+        #offers, wantValue, wantFluff))
+    return offers
+end
+
+--- 获取可问的问题列表（每场最多问 1 个）。
+--- 返回本轮随机抽到的问题；未抽取时即时抽一次，保证界面不会拿到空列表。
 function GameLogic.GetIntelQuestions()
     local s = GameLogic.State
     if s.intelUsedToday then return {} end
-    return GameData.IntelQuestions
+    if not s.intelOffers or #s.intelOffers == 0 then
+        return GameLogic.RollIntelOffers()
+    end
+    return s.intelOffers
 end
 
 --- 询问情报：返回答案文本与标签
 --- 情报指向「明日对手」的性格（今日预生成日程已确定），供次日选择参考
+--- 问了闲聊问题（kind=fluff）→ 只回一句废话，不产出情报，等于浪费这次机会。
 function GameLogic.AskIntel(questionId)
     local s = GameLogic.State
     if s.intelUsedToday then return nil, "今天已经问过了" end
-    -- 询问的是明日对手的性格
+    -- 只能从本轮抽到的问题里问
+    local question
+    for _, q in ipairs(s.intelOffers or {}) do
+        if q.id == questionId then question = q; break end
+    end
+    if not question then return nil, "这个问题不在本轮的话题里" end
+
     local tomorrow = s.currentDay + 1
     local personality = GameLogic.GetDayPersonality(tomorrow)
     local answers = GameData.IntelAnswers[personality]
     if not answers then return nil, "无法获取情报" end
-    local question
-    for _, q in ipairs(GameData.IntelQuestions) do
-        if q.id == questionId then question = q; break end
-    end
-    if not question then return nil, "无效的问题" end
     local answer = answers[question.category]
     if not answer then return nil, "对方不愿多谈" end
+
+    s.intelUsedToday = true
+    -- 闲聊问题：不写入 intel，次日无法据此投其所好。
+    if question.kind == "fluff" then
+        s.intel = nil
+        print(string.format("[Intel] 明日(%d) 问了闲聊问题 %s → 无有效情报", tomorrow, questionId))
+        return {
+            question = question.text,
+            answer = answer.text,
+            tag = answer.tag,
+            useless = true,
+            day = s.currentDay,
+        }
+    end
+
     s.intel = {
         question = question.text,
         answer = answer.text,
@@ -950,7 +1013,6 @@ function GameLogic.AskIntel(questionId)
         forDay = tomorrow,
         day = s.currentDay,
     }
-    s.intelUsedToday = true
     print(string.format("[Intel] 明日(%d)性格=%s 问题=%s 情报=%s",
         tomorrow, personality, questionId, answer.tag))
     return s.intel
