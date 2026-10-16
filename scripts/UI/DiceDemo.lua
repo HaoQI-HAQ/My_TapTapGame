@@ -137,7 +137,7 @@ function DiceDemo.CreateScreen(onBack)
     return Art.Responsive(root, function(w, h)
         local compact = h < 550
         heading:SetStyle({paddingVertical = compact and 9 or 16})
-        headline:SetFontSize(compact and 21 or 27)
+        headline:SetFontSize(Art.FontSize(compact and 21 or 27))
         body:SetStyle({padding = w < 620 and 14 or 22, gap = compact and 12 or 16})
         for _, view in ipairs(views) do view:SetStyle({height = compact and 132 or 235}) end
         for _, card in ipairs(cards) do card:SetStyle({padding = compact and 12 or 18, gap = compact and 8 or 12}) end

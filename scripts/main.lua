@@ -113,6 +113,7 @@ local screenTitles = {
 }
 
 local function WithNavigation(content, screenName)
+    local unit = Art.Unit()
     local returnButton = Art.Button("返回主菜单", function()
         local function leave()
             GameLogic.Reset()
@@ -123,9 +124,9 @@ local function WithNavigation(content, screenName)
         else
             Preferences.ConfirmReturn(leave)
         end
-    end, true, {id = "return_to_menu", width = 112, minHeight = 40, paddingVertical = 6, paddingHorizontal = 8, fontSize = 11})
-    local settings = Art.Button("设置", function() Preferences.ShowSettings() end, true,
-        {id = "open_settings", width = 64, minHeight = 40, paddingVertical = 6, paddingHorizontal = 8, fontSize = 11})
+    end, true, {id = "return_to_menu", width = 124 * unit, minHeight = Art.TouchSize(48), paddingVertical = 9, paddingHorizontal = 8, fontSize = 12})
+    local settings = Art.Button("暂停 / 设置", function() Preferences.ShowSettings() end, true,
+        {id = "open_settings", width = 110 * unit, minHeight = Art.TouchSize(48), paddingVertical = 9, paddingHorizontal = 8, fontSize = 12})
     local toolbar = Art.Safe({UI.Panel {width = "100%", paddingHorizontal = 12, paddingVertical = 6,
         flexDirection = "row", alignItems = "center", gap = 8, backgroundColor = Art.C.dark, children = {
             Art.Text(screenTitles[screenName] or "酒桌文化", 11, Art.C.paper,

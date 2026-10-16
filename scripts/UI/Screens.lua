@@ -56,8 +56,8 @@ local function Sheet(title, subtitle, children, background)
         local compact = h < 550
         body:SetStyle({padding = w < 620 and 14 or 24, gap = compact and 12 or 16})
         heading:SetStyle({paddingHorizontal = w < 620 and 18 or 24, paddingVertical = compact and 9 or 16})
-        headline:SetFontSize(compact and 21 or 27)
-        caption:SetFontSize(compact and 11 or 12)
+        headline:SetFontSize(Art.FontSize(compact and 21 or 27))
+        caption:SetFontSize(Art.FontSize(compact and 11 or 12))
         eyebrow:SetVisible(not compact)
     end)
 end
@@ -267,8 +267,8 @@ local function Selection(title, subtitle, items, kind, onSelect, withHUD)
     return Art.Responsive(root, function(w, h)
         local narrow, compact = w < 650, h < 550
         heading:SetStyle({paddingHorizontal = narrow and 18 or 24, paddingVertical = compact and 8 or 16})
-        headline:SetFontSize(compact and 21 or 27)
-        caption:SetFontSize(compact and 11 or 12)
+        headline:SetFontSize(Art.FontSize(compact and 21 or 27))
+        caption:SetFontSize(Art.FontSize(compact and 11 or 12))
         eyebrow:SetVisible(not compact)
         progress:SetStyle({paddingVertical = compact and 7 or 11, paddingHorizontal = narrow and 14 or 24})
         list:SetStyle({padding = narrow and 14 or 22, paddingBottom = 24})
@@ -420,34 +420,12 @@ function Screens.CreateDayResult()
         GameLogic.ApplyBanquetResult(result)
         resultCache.after = s.currentLevel
     end
-    local labels = {promote = "升职通知", maintain = "平稳落席", demote = "岗位调整", optimized = "优化预警"}
-    local colors = {promote = C.green, maintain = C.purple, demote = C.red, optimized = C.red}
-    local summary = Art.Paper({
-        Profile(s),
-        Art.Title(resultCache.message, 25, colors[resultCache.result], {width = "100%", lineHeight = 1.45}),
-        UI.Panel {width = "100%", padding = 14, gap = 7, borderRadius = 10, backgroundColor = C.lilac, children = {
-            Art.Text("本日职级变动", 11, C.muted),
-            Art.Title("Lv." .. resultCache.before .. "  →  Lv." .. resultCache.after, 28, C.purple),
-            Art.Text(GameLogic.GetLevelData(resultCache.before).name .. " → " ..
-                GameLogic.GetLevelData(resultCache.after).name, 13, C.ink, {width = "100%"}),
-        }},
-        Art.Text((s --[[@as table]]).lastChoiceFeedback or "饭局结束，记得照顾好自己。", 13, C.muted,
-            {width = "100%", lineHeight = 1.65}),
-    }, {minWidth = 0, padding = 22, gap = 16})
-    local details = Art.Paper({
-        Art.Title("散席复盘", 19, C.ink),
-        Art.Stats(s, true),
-        UI.Panel {width = "100%", flexDirection = "row", flexWrap = "wrap", gap = 10, children = {
-            Metric("剩余资金", "¥" .. s.money),
-            Metric("被优化次数", s.optimizeCount .. " / " .. s.maxOptimize, s.optimizeCount > 0 and C.red or C.purple),
-        }},
-        Art.Text("把今天的得失记下，下一场继续从容入席。", 12, C.muted, {width = "100%"}),
-    }, {minWidth = 0, padding = 22, gap = 18})
-    return Sheet(labels[resultCache.result] or "饭局结算", "第 " .. s.currentDay .. " 天 · 饭局复盘", {
-        TwoColumns(summary, details),
-        Art.Button("收好工牌，继续  →", function() GameLogic.ProceedAfterResult(); Navigate(s.phase) end,
-            false, {width = "100%", minHeight = 52}),
-    }, Art.Background(s.restaurant))
+    -- 展示模块只读结算缓存与本场记录；resize 不重判、不应用、不推进。
+    local DayResult = require("UI.DayResult")
+    return DayResult.Create(s, resultCache, function()
+        GameLogic.ProceedAfterResult()
+        Navigate(s.phase)
+    end)
 end
 
 function Screens.CreateGameOver()

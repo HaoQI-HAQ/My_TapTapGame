@@ -99,19 +99,27 @@ function Playing.Create(navigate)
     local RefreshActions = function() end
     local ShowRoll = function() end
     local Settle = function() end
+    local RefreshLayout = function() end
+    ---@type number
+    local layoutW = 0
+    ---@type number
+    local layoutH = 0
 
     local playerArt = Art.Picture(Art.Character(character), {id = "playing_player",
-        position = "absolute", left = "5%", bottom = 0, width = "37%", height = "100%"})
+        position = "absolute", left = "2%", bottom = 0, width = "44%", height = "100%"})
     local opponentArt = Art.Picture(opponentPath, {id = "playing_opponent",
-        position = "absolute", right = "5%", bottom = 0, width = "37%", height = "100%"})
-    local playerTag = Art.Text(character.name or "我方", 11, C.ink,
-        {backgroundColor = C.paper, padding = 6, borderRadius = 6, width = 130, flexShrink = 1})
-    local opponentTag = Art.Text(opponentName, 11, C.white,
-        {backgroundColor = C.purple, padding = 6, borderRadius = 6, width = 160, flexShrink = 1, textAlign = "right"})
-    local stage = UI.Panel {id = "banquet_stage", width = "100%", height = 150, flexShrink = 0,
-        overflow = "hidden", children = {playerArt, opponentArt,
-            UI.Panel {position = "absolute", left = 8, right = 8, bottom = 6,
-                flexDirection = "row", justifyContent = "space-between", children = {playerTag, opponentTag}}}}
+        position = "absolute", right = "2%", bottom = 0, width = "44%", height = "100%"})
+    local foreground = Art.Picture(Art.Pick(A.foreground), {id = "playing_foreground",
+        position = "absolute", left = 0, bottom = 0, width = "100%", height = 160})
+    local playerTag = Art.Text(character.name or "我方", 10, C.white,
+        {backgroundColor = C.dark, padding = 6, borderRadius = 4, width = 156, flexShrink = 1})
+    local opponentTag = Art.Text(opponentName, 10, C.white,
+        {backgroundColor = C.dark, padding = 6, borderRadius = 4, width = 180, flexShrink = 1, textAlign = "right"})
+    local stage = UI.Panel {id = "banquet_stage", width = "100%", height = 240, flexShrink = 0,
+        overflow = "hidden", pointerEvents = "box-none", children = {playerArt, opponentArt, foreground,
+            UI.Panel {position = "absolute", left = 10, right = 10, top = 8,
+                flexDirection = "row", justifyContent = "space-between", pointerEvents = "none",
+                children = {playerTag, opponentTag}}}}
 
     local playerDice = Dice3D.View {styleKey = "classic", width = 76, height = 84, pointerEvents = "none"}
     local opponentDice = Dice3D.View {styleKey = "classic", width = 76, height = 84, pointerEvents = "none"}
@@ -119,37 +127,48 @@ function Playing.Create(navigate)
     opponentDice:Hide()
     local ownCup = Art.Picture(Art.Pick(A.diceCup), {width = 76, height = 84, id = "player_cup"})
     local hiddenCup = Art.Picture(Art.Pick(A.diceCup), {width = 76, height = 84, id = "opponent_cup"})
-    local playerResult = Art.Text("我方 · 待掷", 11, C.white, {width = 98, textAlign = "center", whiteSpace = "nowrap"})
-    local opponentResult = Art.Text("对方 · 保密", 11, C.lilac, {width = 98, textAlign = "center", whiteSpace = "nowrap"})
+    local playerResult = Art.Text("我方 · 待掷", 10, C.white, {width = "100%", textAlign = "center"})
+    local opponentResult = Art.Text("对方 · 保密", 10, C.white, {width = "100%", textAlign = "center"})
     -- 中央：对方押了什么（用「他更大」这类同一参照系文案，避免和玩家的选择混淆）
-    local tellIcon = Art.Title("—", 22, C.yellow, {width = "100%", textAlign = "center", id = "guess_tell"})
-    local tellCaption = Art.Text("他押的是", 10, C.lilac, {width = "100%", textAlign = "center"})
+    local tellIcon = Art.Title("—", 16, C.ink, {width = "100%", textAlign = "center", id = "guess_tell"})
+    local tellCaption = Art.Text("他押的是", 10, C.ink, {width = "100%", textAlign = "center"})
     -- 顶部规则说明：第一眼就知道在赌什么
-    local legend = Art.Text(GameData.GuessDice.legend, 10, C.lilac,
+    local legend = Art.Text(GameData.GuessDice.legend, 12, C.white,
         {width = "100%", id = "guess_legend", lineHeight = 1.45})
     local status = Art.Text("先摇骰，再选你和他谁的点数大。", 12, C.white,
         {width = "100%", id = "guess_status"})
     local result = Art.Text("", 12, C.yellow, {width = "100%", id = "guess_result"})
     result:Hide()
-    local diceRow = UI.Panel {width = "100%", flexDirection = "row", justifyContent = "space-around",
-        alignItems = "center", gap = 8, children = {
-            UI.Panel {alignItems = "center", gap = 3, children = {ownCup, playerDice, playerResult}},
-            UI.Panel {alignItems = "center", width = 92, children = {tellCaption, tellIcon}},
-            UI.Panel {alignItems = "center", gap = 3, children = {hiddenCup, opponentDice, opponentResult}},
+    local tellPanel = UI.Panel {id = "guess_tell_panel", width = 130, height = 44,
+        padding = 0, justifyContent = "center", backgroundImage = Art.Pick(A.brushGold),
+        backgroundFit = "contain", children = {tellCaption, tellIcon}, pointerEvents = "none"}
+    -- 复用原来的两颗真实骰子及回调：只是把骰桌挪到人物舞台前，不产生新点数。
+    local diceRow = UI.Panel {id = "playing_dice_table", position = "absolute", bottom = 6,
+        width = 360, left = 0, flexDirection = "row", justifyContent = "space-between",
+        alignItems = "flex-end", gap = 8, pointerEvents = "none", children = {
+            UI.Panel {width = "29%", alignItems = "center", gap = 2,
+                children = {ownCup, playerDice, playerResult}},
+            tellPanel,
+            UI.Panel {width = "29%", alignItems = "center", gap = 2,
+                children = {hiddenCup, opponentDice, opponentResult}},
         }}
-    local rollButton = Art.Button("摇骰 · 开始本轮", nil, false, {id = "roll_dice", width = "100%"})
+    stage:AddChild(diceRow)
+    local rollButton = Art.Button("摇骰 · 开始本轮", nil, false,
+        {id = "roll_dice", width = "100%", minHeight = math.max(48 * Art.Unit(), Art.TouchSize()), fontSize = 12})
     -- 三个选择按钮：我更大 / 我更小 / 一样大
     ---@type table<string, Widget>
     local guessButtons = {}
     ---@type Widget[]
     local guessChildren = {}
     for _, choice in ipairs(GameData.GuessDice.choices) do
-        local button = Art.Button(choice.icon .. " " .. choice.label, function()
+        local button = Art.Button(choice.label, function(button)
             if not alive or rolling or settled or chosen then return end
             local G = s.guess
             if not G or not G.active or G.winner then return end
             local ok, err = GameLogic.GuessPick(choice.id)
             if not ok then UI.Toast.Show(tostring(err), {variant = "warning"}); return end
+            -- 仅选中纹理反馈，不禁用、不延迟、不改变原来的叫开/重摇时序。
+            for _, other in pairs(guessButtons) do Art.SetSelected(other, other == button) end
             print("[BanquetUI] 玩家选 " .. choice.id)
             if G.winner then
                 Settle()
@@ -178,45 +197,54 @@ function Playing.Create(navigate)
                 RefreshActions()
             end
         end, true,
-            {id = "guess_" .. choice.id, flexGrow = 1, flexBasis = 0, flexShrink = 1,
-                minWidth = 0, minHeight = 54, paddingHorizontal = 6, paddingVertical = 8, fontSize = 15})
+            {id = "guess_" .. choice.id, option = true, flexGrow = 1, flexBasis = 0, flexShrink = 1,
+                minWidth = 0, minHeight = math.max(48 * Art.Unit(), Art.TouchSize()), paddingHorizontal = 8, paddingVertical = 10, fontSize = 12})
         guessButtons[choice.id] = button
         guessChildren[#guessChildren + 1] = button
     end
-    local actionHint = Art.Text("选一个：你觉得谁的点数更大？", 10, C.lilac, {width = "100%", id = "guess_hint"})
-    local actionPanel = UI.Panel {id = "guess_actions", width = "100%", gap = 10, children = {
-        actionHint, UI.Panel {width = "100%", flexDirection = "row", gap = 8,
-            justifyContent = "center", children = guessChildren}}}
+    local actionHint = Art.Text("选一个：你觉得谁的点数更大？", 12, C.white, {width = "100%", id = "guess_hint"})
+    local guessRow = UI.Panel {width = "100%", flexDirection = "row", gap = 8,
+        justifyContent = "center", children = guessChildren}
+    local actionPanel = UI.Panel {id = "guess_actions", width = "100%", gap = 10,
+        children = {actionHint, guessRow}}
     actionPanel:Hide()
     local resultContinue = Art.Button("继续本轮交谈", function()
         if not alive or not settled or opponentDice:IsRolling() then return end
         OpenDialogue()
-    end, false, {id = "guess_continue", width = "100%"})
+    end, false, {id = "guess_continue", width = "100%", minHeight = math.max(48 * Art.Unit(), Art.TouchSize()), fontSize = 12})
     resultContinue:Hide()
+    local diceHeading = Art.Title("猜骰 · 比大小", 16, C.yellow, {width = "62%"})
+    local roundLabel = Art.Text("ROUND " .. s.round .. " / " .. s.maxRounds, 10, C.white,
+        {width = "38%", textAlign = "right"})
     local diceCard = Art.Paper({
-        UI.Panel {width = "100%", flexDirection = "row", justifyContent = "space-between", children = {
-            Art.Title("猜骰 · 比大小", 18, C.white, {width = "50%"}),
-            Art.Text("ROUND " .. s.round .. " / " .. s.maxRounds, 10, C.yellow, {width = "50%", textAlign = "right"})}},
-        legend, diceRow, status, rollButton, actionPanel, result, resultContinue,
-    }, {id = "dice_stage", gap = 12, minWidth = 0, width = "100%"}, true)
+        UI.Panel {width = "100%", flexDirection = "row", justifyContent = "space-between",
+            children = {diceHeading, roundLabel}},
+        legend, status, rollButton, actionPanel, result, resultContinue,
+    }, {id = "dice_stage", gap = 10, minWidth = 0, width = "100%", flexShrink = 0}, true)
+    -- 交谈时保留原揭晓原文；只复制已经显示的结果，不重新读取隐藏点数/押注。
+    local rollSummary = Art.Text("", 12, C.yellow,
+        {id = "playing_roll_summary", width = "100%", lineHeight = 1.4})
+    rollSummary:Hide()
 
-    local speaker = Art.Text("本轮交谈尚未开始", 11, C.purple, {width = "100%"})
-    local dialogue = Art.Text("先在骰桌争取话语权。赢下这一手猜骰，可以打听一条明日情报。", 14, C.ink,
-        {width = "100%", id = "dialogue_text"})
-    local expression = Art.Picture(nil, {width = 50, height = 50, id = "opponent_expression"})
+    local speaker = Art.Text("本轮交谈尚未开始", 12, C.yellow, {width = "100%"})
+    local dialogue = Art.Text("先在骰桌争取话语权。赢下这一手猜骰，可以打听一条明日情报。", 12, C.white,
+        {width = "100%", id = "dialogue_text", lineHeight = 1.5, minHeight = math.max(48 * Art.Unit(), Art.TouchSize())})
+    local expression = Art.Picture(nil, {width = 44, height = 44, id = "opponent_expression"})
     expression:Hide()
-    local feedback = Art.Text(tostring(s.lastChoiceFeedback or ""), 11, C.muted,
-        {width = "100%", id = "last_choice_feedback"})
+    local feedback = Art.Text(tostring(s.lastChoiceFeedback or ""), 12, C.paper,
+        {width = "100%", id = "last_choice_feedback", lineHeight = 1.4})
     if not s.lastChoiceFeedback or s.lastChoiceFeedback == "" then feedback:Hide() end
-    local bubble = UI.Panel {id = "dialogue_bubble", width = "100%", gap = 12,
+    local bubble = UI.Panel {id = "dialogue_bubble", width = "100%", gap = 6,
         onClick = function() if typing then dialogue:SetText(lineText); typing = false end end,
-        children = {UI.Panel {width = "100%", flexDirection = "row", gap = 8, alignItems = "center",
-            children = {Art.Title("酒桌交谈", 18, C.ink, {flexGrow = 1, flexShrink = 1}), expression}},
-            feedback, speaker, dialogue}}
+        children = {feedback,
+            UI.Panel {width = "100%", flexDirection = "row", gap = 6, alignItems = "center",
+                children = {speaker, expression}},
+            dialogue}}
+    speaker:SetStyle({width = "auto", flexGrow = 1, flexShrink = 1, flexBasis = 0})
     ---@type Widget[]
     local choices = {}
     for i, choice in ipairs(event.choices or {}) do
-        choices[#choices + 1] = Art.Button(string.char(64 + i) .. "  " .. choice.text, function()
+        choices[#choices + 1] = Art.Button(string.char(64 + i) .. "  " .. choice.text, function(button)
             if not alive or not ready or chosen then return end
             chosen = true
             local accepted, err = GameLogic.MakeChoice(i, eventToken, roundToken)
@@ -225,16 +253,20 @@ function Playing.Create(navigate)
                 UI.Toast.Show(tostring(err or "选择未生效，请重试。"), {variant = "warning"})
                 return
             end
+            Art.SetSelected(button, true)
             print("[BanquetUI] 对话选择 " .. i .. " / Round " .. roundToken)
             navigate(s.phase)
-        end, i % 2 == 0, {id = "choice_" .. i, width = "100%", textAlign = "left", minHeight = 48})
+        end, true, {id = "choice_" .. i, option = true, width = "100%", textAlign = "left",
+            minHeight = math.max(48 * Art.Unit(), Art.TouchSize()), fontSize = 12, flexShrink = 0})
     end
-    local choiceWrap = UI.Panel {id = "dialogue_choices", width = "100%", gap = 8, children = choices}
+    -- 通宽答案区独立于对白底板；横屏两列、竖屏单列，长句由滚动区兜底。
+    local choiceWrap = UI.Panel {id = "dialogue_choices", width = "100%", gap = 8,
+        flexDirection = "row", flexWrap = "wrap", alignItems = "stretch", children = choices}
     choiceWrap:Hide()
-    local intelAnswer = Art.Text("", 13, C.ink, {width = "100%", id = "intel_answer"})
-    local intelTag = Art.Text("", 11, C.purple, {width = "100%", id = "intel_tag"})
+    local intelAnswer = Art.Text("", 12, C.white, {width = "100%", id = "intel_answer"})
+    local intelTag = Art.Text("", 12, C.purple, {width = "100%", id = "intel_tag"})
     local intelContinue = Art.Button("记下了 · 继续交谈", function() OpenDialogue() end, false,
-        {id = "intel_continue", width = "100%"})
+        {id = "intel_continue", width = "100%", minHeight = math.max(48 * Art.Unit(), Art.TouchSize()), fontSize = 12})
     local intelResponse = UI.Panel {id = "intel_response", width = "100%", gap = 12,
         children = {intelTag, intelAnswer, intelContinue}}
     intelResponse:Hide()
@@ -258,28 +290,34 @@ function Playing.Create(navigate)
             end
             intelResponse:Show()
             print("[BanquetUI] 情报提问 " .. question.id .. (info.useless and "（闲聊）" or ""))
-        end, true, {width = "100%", textAlign = "left", id = "intel_" .. question.id}))
+        end, true, {width = "100%", textAlign = "left", id = "intel_" .. question.id,
+            option = true, minHeight = math.max(48 * Art.Unit(), Art.TouchSize()), fontSize = 12}))
     end
     intelQuestions:Hide()
-    local dialogueCard = Art.Paper({bubble, intelQuestions, intelResponse, choiceWrap},
-        {id = "playing_dialogue", width = "100%", minWidth = 0, gap = 16})
-    local workspace = UI.Panel {id = "banquet_workspace", width = "100%", gap = 14,
-        alignItems = "flex-start", children = {diceCard, dialogueCard}}
-    local content = UI.Panel {width = "100%", padding = 14, gap = 12, children = {stage, workspace}}
+    local dialogueCard = Art.Paper({bubble, intelQuestions, intelResponse},
+        {id = "playing_dialogue", width = "100%", minWidth = 0, gap = 12, flexShrink = 0}, true)
+    dialogueCard:Hide()
+    local workspace = UI.Panel {id = "banquet_workspace", width = "100%", gap = 10,
+        flexDirection = "column", alignItems = "stretch", flexShrink = 0,
+        children = {diceCard, dialogueCard, choiceWrap, rollSummary}}
+    local content = UI.Panel {width = "100%", padding = 12, gap = 10, children = {workspace}}
     local scroll = UI.ScrollView {id = "banquet_scroll", width = "100%", flexGrow = 1, flexBasis = 0,
-        minHeight = 0, flexShrink = 1, scrollY = true, showScrollbar = true, children = {content}}
+        minHeight = 0, flexShrink = 1, scrollY = true, showScrollbar = true,
+        backgroundColor = C.dark, children = {content}}
     local location = Art.Text((restaurant.name or "今晚的饭局") .. "  ·  " ..
         ((s.drinkBrand and s.drinkBrand.name) or "酒水已备") ..
         (s.dish and ("  ·  " .. s.dish.name) or ""), 10, C.white,
-        {width = "100%", backgroundColor = C.purple, paddingHorizontal = 14, paddingVertical = 6})
+        {width = "100%", backgroundColor = C.dark, paddingHorizontal = 14, paddingVertical = 5})
     local root = Art.Root({Art.Safe({Art.HUD(s, GameLogic.GetLevelData(s.currentLevel).name),
-        Art.Stats(s, true), location, scroll})}, Art.Background(restaurant))
+        location, stage, Art.Stats(s, true), scroll})}, Art.Background(restaurant))
+    root:SetStyle({backgroundColor = C.dark})
 
     RefreshActions = function()
         local G = s.guess
         local canAct = alive and not rolling and not settled and G and G.active and not G.winner
         for _, choice in ipairs(GameData.GuessDice.choices) do
             Art.SetDisabled(guessButtons[choice.id], not canAct)
+            if rolling then Art.SetSelected(guessButtons[choice.id], false) end
         end
         if canAct then
             actionHint:SetText("他押「" .. GameData.GuessTellLabel(G.tellChoice) ..
@@ -299,6 +337,11 @@ function Playing.Create(navigate)
         dialogue:SetText("")
         elapsed, shownCharacters, typing = 0, 0, true
         choiceWrap:Show()
+        dialogueCard:Show()
+        diceCard:Hide()
+        rollSummary:SetText(result:GetText())
+        rollSummary:SetVisible(result:IsVisible())
+        RefreshLayout()
         focusDialogue = 2
         print("[BanquetUI] 交谈开放 / Round " .. roundToken)
     end
@@ -308,6 +351,7 @@ function Playing.Create(navigate)
         if s.guess.winner == "player" and not s.intelUsedToday and #GameLogic.GetIntelQuestions() > 0 then
             speaker:SetText("赢得话语权 · 打听明日安排")
             dialogue:SetText("可以问一个问题。回答会保留在这里，读完后再继续交谈。")
+            dialogueCard:Show()
             intelQuestions:Show()
             focusDialogue = 2
         else
@@ -430,20 +474,102 @@ function Playing.Create(navigate)
     rollButton.props.onClick = BeginRoll
 
     -- 只改已有控件的样式，不重抽事件、不重掷、不重复结算。
-    Art.Responsive(root, function(w, h, narrow, short)
-        content:SetStyle({padding = short and 10 or 14, gap = short and 8 or 12})
-        stage:SetStyle({height = short and 72 or (narrow and 100 or 100)})
-        local pad = short and 12 or 16
+    RefreshLayout = function()
+        if layoutW <= 0 or layoutH <= 0 then return end
+        -- 用真实宽高而不是单一窄屏断点：手机横屏也必须是两列答案。
+        local portrait = layoutH > layoutW
+        local short = layoutH < 560
+        local unit = Art.Unit()
+        local touchHeight = math.max(48 * unit, Art.TouchSize())
+        local pad = (short and 10 or (portrait and 12 or 18)) * unit
+        local gap = (short and 8 or 10) * unit
+        local stageRatio = ready and (portrait and 0.25 or 0.30) or (portrait and 0.27 or 0.28)
+        local stageHeight = ready and short and not portrait and 40 * unit
+            or math.max(96, math.min(layoutH * stageRatio, layoutH - 230))
+        stage:SetStyle({height = stageHeight})
+        -- 超短横屏交谈时只留人物条，已揭晓结果在答案下方保留。
+        diceRow:SetVisible(not (ready and short and not portrait))
+        -- 原画保持 contain；纵向半身裁图仅用于实习生，不把人像拉伸或换成大头像。
+        local playerPath = (portrait or short) and character.id == "intern" and Art.Pick(A.characters.intern.half)
+            or Art.Character(character)
+        local background = Art.Background(restaurant, portrait)
+        playerArt:SetStyle({backgroundImage = playerPath, left = "2%", width = "44%",
+            height = short and "100%" or (portrait and "114%" or "186%"),
+            bottom = short and 0 or (portrait and -stageHeight * 0.10 or -stageHeight * 0.85)})
+        root:SetStyle({backgroundImage = background})
+        opponentArt:SetStyle({right = "2%", width = "44%", height = "100%", bottom = 0})
+        foreground:SetStyle({height = math.max(26, stageHeight * 0.22), backgroundFit = "cover"})
+        local tagWidth = (portrait and 100 or 150) * unit
+        playerTag:SetStyle({visible = not (short and not portrait),
+            width = "auto", maxWidth = math.min(tagWidth, layoutW * 0.40),
+            height = "auto", paddingVertical = (short and 3 or 6) * unit,
+            paddingHorizontal = 8 * unit})
+        opponentTag:SetStyle({visible = not (short and not portrait),
+            width = "auto", maxWidth = math.min(tagWidth, layoutW * 0.40),
+            height = "auto", paddingVertical = (short and 3 or 6) * unit,
+            paddingHorizontal = 8 * unit})
+        local diceWidth = math.min(layoutW * (portrait and 0.80 or 0.34), 440 * unit)
+        local dieSize = math.min((ready and 40 or (short and 54 or 70)) * unit, stageHeight * 0.38)
+        diceRow:SetStyle({left = (layoutW - diceWidth) / 2, width = diceWidth,
+            bottom = (ready and 2 or 6) * unit, gap = 4 * unit})
+        tellPanel:SetStyle({width = "38%", height = 48 * unit, padding = 0})
+        tellCaption:SetStyle({lineHeight = 1.1})
+        tellIcon:SetStyle({lineHeight = 1.1})
+        tellCaption:SetFontSize(Art.FontSize(9))
+        tellIcon:SetFontSize(Art.FontSize(12))
+        playerResult:SetFontSize(Art.FontSize(10))
+        opponentResult:SetFontSize(Art.FontSize(10))
+        playerTag:SetFontSize(Art.FontSize(10))
+        opponentTag:SetFontSize(Art.FontSize(10))
         for _, die in ipairs({playerDice, opponentDice, ownCup, hiddenCup}) do
-            die:SetStyle({width = 64, height = 70})
+            die:SetStyle({width = dieSize, height = dieSize + 8 * unit})
         end
-        workspace:SetStyle({flexDirection = narrow and "column" or "row", gap = 14})
-        diceCard:SetStyle({width = narrow and "100%" or "40%", flexShrink = 0, padding = pad, gap = 8})
-        -- 短屏优先保证骰桌与按钮可见，规则说明只在空间充足时展示。
-        legend:SetVisible(not short)
-        dialogueCard:SetStyle({width = narrow and "100%" or "auto", flexGrow = 1,
-            flexShrink = 1, flexBasis = narrow and "auto" or 0, padding = short and 14 or 20})
-        dialogue:SetFontSize(short and 12 or 14)
+        content:SetStyle({padding = pad, gap = gap})
+        workspace:SetStyle({flexDirection = "column", gap = gap})
+        diceCard:SetStyle({width = "100%", padding = (short and 16 or 22) * unit, gap = 8 * unit})
+        dialogueCard:SetStyle({width = "100%", padding = (short and not portrait and 8 or 14) * unit,
+            gap = 6 * unit})
+        guessRow:SetStyle({gap = 8 * unit})
+        actionPanel:SetStyle({gap = 10 * unit})
+        intelQuestions:SetStyle({gap = 8 * unit})
+        intelResponse:SetStyle({gap = 12 * unit})
+        for _, label in ipairs({dialogue, legend, status, result, actionHint,
+            speaker, feedback, intelAnswer, intelTag, rollSummary}) do
+            label:SetFontSize(Art.FontSize(12))
+        end
+        diceHeading:SetFontSize(Art.FontSize(16))
+        roundLabel:SetFontSize(Art.FontSize(10))
+        location:SetFontSize(Art.FontSize(10))
+        dialogue:SetStyle({minHeight = short and not portrait and 0 or touchHeight,
+            lineHeight = short and not portrait and 1.25 or 1.5})
+        expression:SetStyle({width = 44 * unit, height = 44 * unit})
+        bubble:SetStyle({gap = 6 * unit})
+        choiceWrap:SetStyle({flexDirection = "row", flexWrap = "wrap", gap = gap})
+        local innerWidth = math.max(0, layoutW - pad * 2)
+        local choiceWidth = portrait and innerWidth or math.max(0, (innerWidth - gap) / 2)
+        for _, button in ipairs(choices) do
+            button:SetStyle({width = choiceWidth, flexGrow = 0, flexShrink = 0,
+                minHeight = touchHeight, paddingHorizontal = 20 * unit, paddingVertical = 12 * unit})
+        end
+        for _, button in ipairs({rollButton, resultContinue, intelContinue, table.unpack(choices)}) do
+            button:SetStyle({minHeight = touchHeight, paddingHorizontal = 20 * unit, paddingVertical = 12 * unit})
+            local label = button:GetChildAt(1) --[[@as Label?]]
+            if label then label:SetFontSize(Art.FontSize(12)) end
+        end
+        for _, button in pairs(guessButtons) do
+            button:SetStyle({minHeight = touchHeight, paddingHorizontal = 8 * unit, paddingVertical = 10 * unit})
+            local label = button:GetChildAt(1) --[[@as Label?]]
+            if label then label:SetFontSize(Art.FontSize(12)) end
+        end
+        for _, button in ipairs(intelQuestions:GetChildren()) do
+            button:SetStyle({minHeight = touchHeight, paddingHorizontal = 20 * unit, paddingVertical = 12 * unit})
+            local label = button:GetChildAt(1) --[[@as Label?]]
+            if label then label:SetFontSize(Art.FontSize(12)) end
+        end
+    end
+    Art.Responsive(root, function(w, h)
+        layoutW, layoutH = w, h
+        RefreshLayout()
     end)
     local update = root.Update
     root.Update = function(self, dt)

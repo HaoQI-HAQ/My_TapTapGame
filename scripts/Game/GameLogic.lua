@@ -1479,7 +1479,7 @@ end
 
 --- 当前模式的主导属性显示名。
 function GameLogic.GetDriverLabel()
-    return GameData.GetPromotionRule(GameLogic.State.mode).driverLabel
+    return (GameData.GetPromotionRule(GameLogic.State.mode) --[[@as table]]).driverLabel
         or (GameLogic.State.mode == "offwork" and "骨气" or "好感")
 end
 

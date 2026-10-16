@@ -259,7 +259,8 @@ function Preferences.ShowSettings()
             fontSize = 12, minHeight = 44})
     end
     RefreshSpeed()
-    local content = UI.Panel {width = "100%", paddingRight = 16, gap = 14, children = {
+    local unit = Art.Unit()
+    local content = UI.Panel {width = "100%", paddingRight = 16, gap = 14 * unit, children = {
         Art.Title("桌边偏好", 23, C.purple, {id = "settings_title", width = "100%"}),
         Art.Text("按自己的节奏入席。网页预览刷新后需重新设置。", 11, C.muted, {width = "100%", fontFamily = "sans"}),
         UI.Panel {width = "100%", gap = 4, children = {
@@ -289,7 +290,7 @@ function Preferences.ShowSettings()
         Art.Button("完成", function() modal:Close() end, false,
             {id = "settings_close", width = "100%"}),
     }})
-    ResponsiveModal(modal, body, 400)
+    ResponsiveModal(modal, body, 400 * unit)
     modal:Open()
     print("[Preferences] 设置弹层已打开")
     return modal
